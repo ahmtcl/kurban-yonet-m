@@ -250,7 +250,7 @@ export default function Dashboard() {
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value: number) => `${value.toLocaleString('tr-TR')} ₺`}
+                      formatter={(value: number | undefined) => `${(value || 0).toLocaleString('tr-TR')} ₺`}
                       contentStyle={{
                         background: '#fff',
                         border: '1px solid #e2e8f0',
