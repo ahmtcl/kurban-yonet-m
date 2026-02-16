@@ -426,13 +426,38 @@ export default function YeniKayit() {
                                 <>
                                     <div className="form-group">
                                         <label className="form-label">Bir Grup Seçin</label>
-                                        <select className="form-select" value={selectedGroupId} onChange={(e) => setSelectedGroupId(e.target.value)} size={5} style={{ height: 'auto' }}>
-                                            {groups.map(g => (
-                                                <option key={g.id} value={g.id} style={{ padding: 8 }}>
-                                                    {g.name} — {g.shareTypeName} ({g.memberIds.length} Üye)
-                                                </option>
-                                            ))}
-                                        </select>
+                                        <div style={{
+                                            maxHeight: 250,
+                                            overflowY: 'auto',
+                                            border: '1px solid #ddd',
+                                            borderRadius: 4,
+                                            background: '#fff'
+                                        }}>
+                                            {groups.length > 0 ? groups.map(g => (
+                                                <div
+                                                    key={g.id}
+                                                    onClick={() => setSelectedGroupId(g.id)}
+                                                    style={{
+                                                        padding: '10px 12px',
+                                                        borderBottom: '1px solid #eee',
+                                                        cursor: 'pointer',
+                                                        backgroundColor: selectedGroupId === g.id ? '#e3f2fd' : 'transparent',
+                                                        color: selectedGroupId === g.id ? '#0d47a1' : 'inherit',
+                                                        fontWeight: selectedGroupId === g.id ? 600 : 400,
+                                                        display: 'flex',
+                                                        justifyContent: 'space-between',
+                                                        alignItems: 'center'
+                                                    }}
+                                                >
+                                                    <span>{g.name}</span>
+                                                    <span style={{ fontSize: 12, color: selectedGroupId === g.id ? '#0d47a1' : '#666' }}>
+                                                        {g.shareTypeName} • {g.memberIds.length} Üye
+                                                    </span>
+                                                </div>
+                                            )) : (
+                                                <div style={{ padding: 20, textAlign: 'center', color: '#999' }}>Hiç grup bulunamadı.</div>
+                                            )}
+                                        </div>
                                     </div>
 
                                     {selectedGroupId && (
@@ -456,7 +481,7 @@ export default function YeniKayit() {
                                     )}
 
                                     <div className="modal-footer">
-                                        <button className="btn btn-primary" onClick={handleSelectGroup} disabled={!selectedGroupId}>Bu Gruba Ekle</button>
+                                        <button type="button" className="btn btn-primary" onClick={handleSelectGroup} disabled={!selectedGroupId}>Bu Gruba Ekle</button>
                                     </div>
                                 </>
                             ) : (
@@ -477,7 +502,7 @@ export default function YeniKayit() {
                                         </div>
                                     </div>
                                     <div className="modal-footer">
-                                        <button className="btn btn-success" onClick={handleCreateGroup} disabled={!newGroupName.trim()}>Grup Oluştur ve Seç</button>
+                                        <button type="button" className="btn btn-success" onClick={handleCreateGroup} disabled={!newGroupName.trim()}>Grup Oluştur ve Seç</button>
                                     </div>
                                 </>
                             )}

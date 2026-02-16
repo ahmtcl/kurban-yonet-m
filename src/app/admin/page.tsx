@@ -235,6 +235,7 @@ export default function AdminPage() {
                                 <input className="form-input" type="number" value={settingsForm.targetCount} onChange={(e) => setSettingsForm({ ...settingsForm, targetCount: parseInt(e.target.value) || 0 })} />
                             </div>
                             <div className="form-group">
+                                <label className="form-label">Varsayılan Gün</label>
                                 <select className="form-select" value={settingsForm.daySelectionDefault} onChange={(e) => setSettingsForm({ ...settingsForm, daySelectionDefault: parseInt(e.target.value) as 1 | 2 | 3 })}>
                                     <option value={1}>1. Gün</option>
                                     <option value={2}>2. Gün</option>

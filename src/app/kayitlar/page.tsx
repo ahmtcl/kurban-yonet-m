@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { FiSearch, FiEdit, FiTrash2, FiDownload, FiX, FiCheck, FiFilter } from 'react-icons/fi';
-import { getRecords, getShareTypes, deleteRecord, updateRecord, getGroups } from '@/lib/firestore';
-import type { Record as RecordType, ShareType, PaymentType, Group } from '@/types';
+import { FiSearch, FiEdit, FiTrash2, FiDownload, FiRefreshCw } from 'react-icons/fi';
+import { getRecords, getShareTypes, deleteRecord, getGroups } from '@/lib/firestore';
+import type { Record as RecordType, ShareType, Group } from '@/types';
+import RecordEditModal from '@/components/modals/RecordEditModal';
 
 export default function KayitlarPage() {
     const [records, setRecords] = useState<RecordType[]>([]);
@@ -26,7 +27,8 @@ export default function KayitlarPage() {
 
     useEffect(() => { loadData(); }, []);
 
-    async function loadData() {
+    async function loadData(showFeedback = false) {
+        setLoading(true);
         try {
             const [recs, types, grps] = await Promise.all([
                 getRecords(),
@@ -36,13 +38,14 @@ export default function KayitlarPage() {
             setRecords(recs);
             setShareTypes(types);
             setGroups(grps);
+            if (showFeedback) showToast('success', 'Veriler yenilendi.');
         } catch (err) {
             console.error(err);
         } finally { setLoading(false); }
     }
 
-    const filtered = useMemo(() => {
-        return records.filter((r) => {
+    const filteredAndSorted = useMemo(() => {
+        const result = records.filter((r) => {
             const matchSearch = !search ||
                 r.ownerName.toLowerCase().includes(search.toLowerCase()) ||
                 r.phone.includes(search) ||
@@ -54,13 +57,24 @@ export default function KayitlarPage() {
 
             return matchSearch && matchShare && matchPayment && matchGroup && matchDay;
         });
+
+        // Default sort by createdAt desc (newest first)
+        return result.sort((a, b) => {
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
     }, [records, search, filterShareType, filterPayment, filterGroup, filterDay]);
 
     // Summary
-    const totalCount = filtered.length;
-    const totalAmount = filtered.reduce((s, r) => s + (r.totalPrice || 0), 0);
-    const totalPaid = filtered.reduce((s, r) => s + (r.depositAmount || 0), 0);
+    const totalCount = filteredAndSorted.length;
+    const totalAmount = filteredAndSorted.reduce((s, r) => s + (r.totalPrice || 0), 0);
+    const totalPaid = filteredAndSorted.reduce((s, r) => s + (r.depositAmount || 0), 0);
     const totalRemaining = totalAmount - totalPaid;
+
+    // Helper functions (Moved back into scope)
+    function showToast(type: string, message: string) {
+        setToast({ type, message });
+        setTimeout(() => setToast(null), 3000);
+    }
 
     async function handleDelete(id: string) {
         try {
@@ -71,64 +85,147 @@ export default function KayitlarPage() {
         } catch { showToast('error', 'Hata!'); }
     }
 
-    async function handleUpdateRecord() {
-        if (!editRecord) return;
+
+    // Export PDF
+    async function exportPdf() {
         try {
-            await updateRecord(editRecord.id, {
-                ownerName: editRecord.ownerName,
-                phone: editRecord.phone,
-                phoneBackup: editRecord.phoneBackup,
-                depositAmount: editRecord.depositAmount,
-                paymentType: editRecord.paymentType,
-                notes: editRecord.notes,
-                dueDate: editRecord.dueDate,
-                daySelection: editRecord.daySelection,
-                // Group update is not requested here, keeping simple edit
+            const jsPDFModule = await import('jspdf');
+            const jsPDF = jsPDFModule.default;
+            const autoTableModule = await import('jspdf-autotable');
+            const autoTable = autoTableModule.default;
+
+            const doc = new jsPDF();
+
+            doc.setFontSize(18);
+            doc.text('Kurban Hissedarları Listesi', 14, 22);
+            doc.setFontSize(11);
+            doc.text(`Tarih: ${new Date().toLocaleDateString('tr-TR')}`, 14, 30);
+
+            const tableColumn = ["Sıra", "Ad Soyad", "Telefon", "Hisse", "Grup", "Gün", "Toplam", "Kalan", "Not"];
+            const tableRows: any[] = [];
+
+            filteredAndSorted.forEach((r, index) => {
+                const group = groups.find(g => g.id === r.groupId);
+                const kalan = (r.totalPrice || 0) - r.depositAmount;
+                const rowData = [
+                    index + 1,
+                    r.ownerName,
+                    r.phone,
+                    r.shareTypeName || '-',
+                    group ? group.name : '-',
+                    r.daySelection ? `${r.daySelection}. Gün` : '-',
+                    `${(r.totalPrice || 0).toLocaleString('tr-TR')} ₺`,
+                    `${kalan.toLocaleString('tr-TR')} ₺`,
+                    r.notes || ''
+                ];
+                tableRows.push(rowData);
             });
-            showToast('success', 'Kayıt güncellendi!');
-            setEditRecord(null);
-            await loadData();
-        } catch { showToast('error', 'Hata!'); }
+
+            // Call autoTable as a function
+            // @ts-ignore
+            autoTable(doc, {
+                head: [tableColumn],
+                body: tableRows,
+                startY: 35,
+                styles: { fontSize: 8, cellPadding: 2 },
+                headStyles: { fillColor: [44, 62, 80] },
+            });
+
+            doc.save(`kurban_listesi_${new Date().toLocaleDateString('tr-TR')}.pdf`);
+
+        } catch (error) {
+            console.error('PDF Export Error:', error);
+            alert('PDF oluşturulurken bir hata oluştu: ' + (error as any).message);
+        }
     }
 
     function exportExcel() {
         import('xlsx').then((XLSX) => {
-            const data = filtered.map((r) => {
+            // Prepare Data
+            const title = [`KURBAN HİSSEDARLARI LİSTESİ - ${new Date().toLocaleDateString('tr-TR')}`];
+            const headers = ['Sıra', 'Ad Soyad', 'Telefon', 'Yedek Tel', 'Hisse', 'Grup', 'Gün', 'Toplam', 'Ödenen', 'Kalan', 'Ödeme Türü', 'Vade', 'Kayıt Tarihi', 'Açıklama'];
+
+            const dataRows = filteredAndSorted.map((r, i) => {
                 const group = groups.find(g => g.id === r.groupId);
-                return {
-                    'Ad Soyad': r.ownerName,
-                    'Telefon': r.phone,
-                    'Hisse': r.shareTypeName || '',
-                    'Grup': group ? group.name : 'Yok',
-                    'Gün': r.daySelection ? `${r.daySelection}. Gün` : '',
-                    'Toplam': r.totalPrice,
-                    'Ödenen': r.depositAmount,
-                    'Kalan': (r.totalPrice || 0) - r.depositAmount,
-                    'Ödeme Türü': r.paymentType === 'nakit' ? 'Nakit' : r.paymentType === 'kredi_karti' ? 'Kredi Kartı' : 'Havale',
-                    'Vade': r.dueDate ? new Date(r.dueDate).toLocaleDateString('tr-TR') : '',
-                    'Kayıt Tarihi': new Date(r.createdAt).toLocaleDateString('tr-TR'),
-                    'Açıklama': r.notes,
-                };
+                const kalan = (r.totalPrice || 0) - r.depositAmount;
+                return [
+                    i + 1,
+                    r.ownerName,
+                    r.phone,
+                    r.phoneBackup || '',
+                    r.shareTypeName || '',
+                    group ? group.name : 'Yok',
+                    r.daySelection ? `${r.daySelection}. Gün` : '',
+                    r.totalPrice || 0,
+                    r.depositAmount || 0,
+                    kalan,
+                    r.paymentType === 'nakit' ? 'Nakit' : r.paymentType === 'kredi_karti' ? 'Kredi Kartı' : 'Havale',
+                    r.dueDate ? new Date(r.dueDate).toLocaleDateString('tr-TR') : '',
+                    new Date(r.createdAt).toLocaleDateString('tr-TR'),
+                    r.notes || ''
+                ];
             });
-            const ws = XLSX.utils.json_to_sheet(data);
+
+            // Calculate Totals
+            const totalTutar = filteredAndSorted.reduce((acc, r) => acc + (r.totalPrice || 0), 0);
+            const totalOdenen = filteredAndSorted.reduce((acc, r) => acc + (r.depositAmount || 0), 0);
+            const totalKalan = totalTutar - totalOdenen;
+
+            const footerRow = ['', '', '', '', '', '', 'GENEL TOPLAM:', totalTutar, totalOdenen, totalKalan, '', '', '', ''];
+
+            // Combine all data
+            const wsData = [
+                title,
+                [], // Empty row
+                headers,
+                ...dataRows,
+                [], // Empty row
+                footerRow
+            ];
+
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+            // Column Widths
+            const colWidths = [
+                { wch: 5 },  // Sıra
+                { wch: 25 }, // Ad Soyad
+                { wch: 15 }, // Telefon
+                { wch: 15 }, // Yedek Tel
+                { wch: 15 }, // Hisse
+                { wch: 20 }, // Grup
+                { wch: 10 }, // Gün
+                { wch: 15 }, // Toplam
+                { wch: 15 }, // Ödenen
+                { wch: 15 }, // Kalan
+                { wch: 15 }, // Ödeme Türü
+                { wch: 12 }, // Vade
+                { wch: 12 }, // Kayıt Tarihi
+                { wch: 40 }  // Açıklama
+            ];
+            ws['!cols'] = colWidths;
+
+            // Merge Title
+            ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 13 } }];
+
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Kayıtlar');
-            XLSX.writeFile(wb, `kayitlar_${new Date().toLocaleDateString('tr-TR')}.xlsx`);
+            XLSX.writeFile(wb, `kurban_listesi_${new Date().toLocaleDateString('tr-TR')}.xlsx`);
         });
     }
 
-    function showToast(type: string, message: string) {
-        setToast({ type, message });
-        setTimeout(() => setToast(null), 3000);
-    }
-
-    if (loading) return <div className="loading"><div className="spinner" /></div>;
+    if (loading && records.length === 0) return <div className="loading"><div className="spinner" /></div>;
 
     return (
         <>
             <div className="top-bar">
                 <h2>📋 Kayıtlar</h2>
                 <div className="top-bar-actions">
+                    <button className="btn btn-ghost btn-sm" onClick={() => loadData(true)} title="Yenile">
+                        <FiRefreshCw /> Yenile
+                    </button>
+                    <button className="btn btn-outline btn-sm" onClick={exportPdf}>
+                        <FiDownload /> PDF
+                    </button>
                     <button className="btn btn-success btn-sm" onClick={exportExcel}>
                         <FiDownload /> Excel
                     </button>
@@ -200,19 +297,18 @@ export default function KayitlarPage() {
                             <tr>
                                 <th>#</th>
                                 <th>Ad Soyad</th>
-                                <th>Telefon</th>
-                                <th>Hisse</th>
-                                <th>Grup</th>
+                                <th>Telefon / Yedek</th>
+                                <th>Hisse / Grup</th>
                                 <th>Gün</th>
                                 <th>Toplam</th>
-                                <th>Ödenen</th>
-                                <th>Kalan</th>
+                                <th>Ödenen / Kalan</th>
                                 <th>Vade</th>
+                                <th>Açıklama</th>
                                 <th>İşlem</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.length > 0 ? filtered.map((r, i) => {
+                            {filteredAndSorted.length > 0 ? filteredAndSorted.map((r, i) => {
                                 const kalan = (r.totalPrice || 0) - r.depositAmount;
                                 const isOverdue = r.dueDate && new Date(r.dueDate) < new Date() && kalan > 0;
                                 const group = groups.find(g => g.id === r.groupId);
@@ -222,16 +318,15 @@ export default function KayitlarPage() {
                                         <td style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
                                         <td style={{ fontWeight: 500 }}>
                                             {r.ownerName}
-                                            {r.notes && <div style={{ fontSize: 11, color: '#888', fontStyle: 'italic', maxWidth: 150, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.notes}</div>}
+                                            <div style={{ fontSize: 11, color: '#999' }}>{new Date(r.createdAt).toLocaleDateString('tr-TR')}</div>
                                         </td>
-                                        <td style={{ fontSize: 13 }}>{r.phone}</td>
-                                        <td><span className="badge badge-primary">{r.shareTypeName}</span></td>
                                         <td>
-                                            {group ? (
-                                                <span style={{ fontSize: 13, fontWeight: 500 }}>{group.name}</span>
-                                            ) : (
-                                                <span style={{ color: '#ccc' }}>—</span>
-                                            )}
+                                            <div style={{ fontSize: 13 }}>{r.phone}</div>
+                                            {r.phoneBackup && <div style={{ fontSize: 11, color: '#666' }}>Yedek: {r.phoneBackup}</div>}
+                                        </td>
+                                        <td>
+                                            <span className="badge badge-primary" style={{ marginBottom: 2, display: 'inline-block' }}>{r.shareTypeName}</span>
+                                            {group && <div style={{ fontSize: 12, color: '#555' }}>{group.name}</div>}
                                         </td>
                                         <td>
                                             <span style={{
@@ -245,15 +340,16 @@ export default function KayitlarPage() {
                                                 {r.daySelection}. Gün
                                             </span>
                                         </td>
-                                        <td>{(r.totalPrice || 0).toLocaleString('tr-TR')} ₺</td>
-                                        <td style={{ color: 'var(--accent-success)' }}>{r.depositAmount.toLocaleString('tr-TR')} ₺</td>
+                                        <td style={{ fontWeight: 600 }}>{(r.totalPrice || 0).toLocaleString('tr-TR')} ₺</td>
                                         <td>
-                                            <span className={`badge ${kalan > 0 ? 'badge-warning' : 'badge-success'}`}>
-                                                {kalan.toLocaleString('tr-TR')} ₺
-                                            </span>
+                                            <div style={{ color: 'var(--accent-success)', fontSize: 13 }}>{r.depositAmount.toLocaleString('tr-TR')} ₺</div>
+                                            {kalan > 0 && <div style={{ color: 'var(--accent-warning)', fontSize: 12, fontWeight: 500 }}>Kalan: {kalan.toLocaleString('tr-TR')} ₺</div>}
                                         </td>
                                         <td style={{ color: isOverdue ? 'var(--accent-danger)' : 'var(--text-secondary)', fontSize: 13 }}>
                                             {r.dueDate ? new Date(r.dueDate).toLocaleDateString('tr-TR') : '—'}
+                                        </td>
+                                        <td style={{ maxWidth: 200 }}>
+                                            <div style={{ fontSize: 13, color: '#444', maxHeight: 60, overflowY: 'auto' }}>{r.notes || '—'}</div>
                                         </td>
                                         <td>
                                             <div style={{ display: 'flex', gap: 4 }}>
@@ -278,7 +374,7 @@ export default function KayitlarPage() {
                                 );
                             }) : (
                                 <tr>
-                                    <td colSpan={11} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+                                    <td colSpan={10} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
                                         Kayıt bulunamadı
                                     </td>
                                 </tr>
@@ -288,66 +384,16 @@ export default function KayitlarPage() {
                 </div>
             </div>
 
-            {/* Edit Modal */}
+            {/* Shared Edit Modal */}
             {editRecord && (
-                <div className="modal-backdrop" onClick={() => setEditRecord(null)}>
-                    <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
-                        <div className="modal-header">
-                            <h3>Kayıt Düzenle</h3>
-                            <button className="btn btn-icon btn-ghost" onClick={() => setEditRecord(null)}><FiX /></button>
-                        </div>
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label className="form-label">Ad Soyad</label>
-                                <input className="form-input" value={editRecord.ownerName} onChange={(e) => setEditRecord({ ...editRecord, ownerName: e.target.value })} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Telefon</label>
-                                <input className="form-input" value={editRecord.phone} onChange={(e) => setEditRecord({ ...editRecord, phone: e.target.value })} />
-                            </div>
-                        </div>
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label className="form-label">Yedek Telefon</label>
-                                <input className="form-input" value={editRecord.phoneBackup} onChange={(e) => setEditRecord({ ...editRecord, phoneBackup: e.target.value })} />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Ödenen Tutar</label>
-                                <input className="form-input" type="number" value={editRecord.depositAmount} onChange={(e) => setEditRecord({ ...editRecord, depositAmount: parseFloat(e.target.value) || 0 })} />
-                            </div>
-                        </div>
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label className="form-label">Kesim Günü</label>
-                                <select className="form-select" value={editRecord.daySelection} onChange={(e) => setEditRecord({ ...editRecord, daySelection: parseInt(e.target.value) as 1 | 2 | 3 })}>
-                                    <option value={1}>1. Gün</option>
-                                    <option value={2}>2. Gün</option>
-                                    <option value={3}>3. Gün</option>
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Ödeme Türü</label>
-                                <select className="form-select" value={editRecord.paymentType} onChange={(e) => setEditRecord({ ...editRecord, paymentType: e.target.value as PaymentType })}>
-                                    <option value="nakit">Nakit</option>
-                                    <option value="kredi_karti">Kredi Kartı</option>
-                                    <option value="havale">Havale / EFT</option>
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Vade Tarihi</label>
-                                <input className="form-input" type="date" value={editRecord.dueDate ? new Date(editRecord.dueDate).toISOString().split('T')[0] : ''} onChange={(e) => setEditRecord({ ...editRecord, dueDate: e.target.value ? new Date(e.target.value) : null })} />
-                            </div>
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">Açıklama</label>
-                            <textarea className="form-textarea" value={editRecord.notes} onChange={(e) => setEditRecord({ ...editRecord, notes: e.target.value })} />
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn btn-ghost" onClick={() => setEditRecord(null)}>İptal</button>
-                            <button className="btn btn-primary" onClick={handleUpdateRecord}><FiCheck /> Güncelle</button>
-                        </div>
-                    </div>
-                </div>
+                <RecordEditModal
+                    record={editRecord}
+                    onClose={() => setEditRecord(null)}
+                    onSave={() => {
+                        showToast('success', 'Kayıt güncellendi!');
+                        loadData();
+                    }}
+                />
             )}
 
             {/* Delete Confirm */}
