@@ -1,22 +1,23 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAdmin } from '@/context/AdminContext';
-import { FiLock, FiSettings, FiTag, FiLogOut, FiSave, FiPlus, FiTrash2, FiList, FiSearch, FiEdit } from 'react-icons/fi';
-import { getSettings, updateSettings, getShareTypes, addShareType, deleteShareType, getRecords } from '@/lib/firestore';
-import type { Settings, ShareType, Record as RecordType } from '@/types';
+import { useAuth } from '@/context/AuthContext';
+import { FiLock, FiSettings, FiTag, FiLogOut, FiSave, FiPlus, FiTrash2, FiList, FiSearch, FiEdit, FiUsers, FiUserPlus, FiUserCheck, FiUserX } from 'react-icons/fi';
+import { getSettings, updateSettings, getShareTypes, addShareType, deleteShareType, getRecords, getUsers, addUser, updateUser, deleteUser } from '@/lib/firestore';
+import type { Settings, ShareType, Record as RecordType, User, UserRole } from '@/types';
 import RecordEditModal from '@/components/modals/RecordEditModal';
+import { useRouter } from 'next/navigation';
 
 export default function AdminPage() {
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-    const { isAdmin, login, logout } = useAdmin();
-    const [activeTab, setActiveTab] = useState<'settings' | 'shares' | 'collections'>('collections');
+    const { user, isAdmin, logout, loading: authLoading } = useAuth();
+    const router = useRouter();
+    const [activeTab, setActiveTab] = useState<'settings' | 'shares' | 'collections' | 'users'>('collections');
 
     // Data State
     const [settings, setSettings] = useState<Settings | null>(null);
     const [shareTypes, setShareTypes] = useState<ShareType[]>([]);
     const [records, setRecords] = useState<RecordType[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
 
@@ -31,18 +32,30 @@ export default function AdminPage() {
     const [newShareMaxKg, setNewShareMaxKg] = useState('');
 
     useEffect(() => {
-        if (isAdmin) {
+        if (!authLoading && !user) {
+            router.push('/login');
+        }
+        if (user && !isAdmin) {
+            router.push('/');
+        }
+        if (user && isAdmin) {
             loadData();
         }
-    }, [isAdmin]);
+    }, [user, authLoading, isAdmin]);
 
     async function loadData() {
         setLoading(true);
         try {
-            const [s, t, r] = await Promise.all([getSettings(), getShareTypes(), getRecords()]);
+            const [s, t, r, u] = await Promise.all([
+                getSettings(),
+                getShareTypes(),
+                getRecords(),
+                isAdmin ? getUsers() : Promise.resolve([])
+            ]);
             setSettings(s);
             setShareTypes(t);
             setRecords(r);
+            setUsers(u);
         } catch (e) {
             console.error(e);
         } finally {
@@ -50,12 +63,42 @@ export default function AdminPage() {
         }
     }
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!login(password)) {
-            setError('Hatalı şifre!');
+    // User Management State
+    const [newUserName, setNewUserName] = useState('');
+    const [newUserUsername, setNewUserUsername] = useState('');
+    const [newUserPassword, setNewUserPassword] = useState('');
+    const [newUserRole, setNewUserRole] = useState<UserRole>('employee');
+
+    async function handleAddUser() {
+        if (!newUserName || !newUserUsername || !newUserPassword) return;
+        setSaving(true);
+        try {
+            await addUser({
+                fullName: newUserName,
+                username: newUserUsername,
+                password: newUserPassword,
+                role: newUserRole,
+                isActive: true
+            });
+            setNewUserName('');
+            setNewUserUsername('');
+            setNewUserPassword('');
+            loadData();
+        } catch (e) {
+            alert('Hata!');
+        } finally {
+            setSaving(false);
         }
-    };
+    }
+
+    async function handleToggleUser(user: User) {
+        try {
+            await updateUser(user.id, { isActive: !user.isActive });
+            loadData();
+        } catch (e) {
+            alert('Hata');
+        }
+    }
 
     async function handleSaveSettings() {
         if (!settings) return;
@@ -105,7 +148,8 @@ export default function AdminPage() {
 
     const filteredRecords = records.filter(r =>
         r.ownerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (r.phone && r.phone.includes(searchQuery))
+        (r.phone && r.phone.includes(searchQuery)) ||
+        (r.orderNumber && r.orderNumber.toString().includes(searchQuery))
     );
 
     if (isAdmin) {
@@ -120,25 +164,35 @@ export default function AdminPage() {
                     </button>
                 </div>
 
-                <div className="tabs" style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
+                <div className="tabs" style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
                     <button
                         className={`btn ${activeTab === 'collections' ? 'btn-primary' : 'btn-ghost'}`}
                         onClick={() => setActiveTab('collections')}
                     >
                         <FiList /> Kayıtlar & Tahsilat
                     </button>
-                    <button
-                        className={`btn ${activeTab === 'settings' ? 'btn-primary' : 'btn-ghost'}`}
-                        onClick={() => setActiveTab('settings')}
-                    >
-                        <FiSettings /> Genel Ayarlar
-                    </button>
-                    <button
-                        className={`btn ${activeTab === 'shares' ? 'btn-primary' : 'btn-ghost'}`}
-                        onClick={() => setActiveTab('shares')}
-                    >
-                        <FiTag /> Hisse Tipleri
-                    </button>
+                    {isAdmin && (
+                        <>
+                            <button
+                                className={`btn ${activeTab === 'users' ? 'btn-primary' : 'btn-ghost'}`}
+                                onClick={() => setActiveTab('users')}
+                            >
+                                <FiUsers /> Kullanıcı Yönetimi
+                            </button>
+                            <button
+                                className={`btn ${activeTab === 'settings' ? 'btn-primary' : 'btn-ghost'}`}
+                                onClick={() => setActiveTab('settings')}
+                            >
+                                <FiSettings /> Genel Ayarlar
+                            </button>
+                            <button
+                                className={`btn ${activeTab === 'shares' ? 'btn-primary' : 'btn-ghost'}`}
+                                onClick={() => setActiveTab('shares')}
+                            >
+                                <FiTag /> Hisse Tipleri
+                            </button>
+                        </>
+                    )}
                 </div>
 
                 {loading ? <div className="loading">Yükleniyor...</div> : (
@@ -150,7 +204,7 @@ export default function AdminPage() {
                                         <div style={{ position: 'relative' }}>
                                             <input
                                                 className="form-input"
-                                                placeholder="İsim veya telefon ile ara..."
+                                                placeholder="İsim, telefon veya sipariş no ile ara..."
                                                 value={searchQuery}
                                                 onChange={(e) => setSearchQuery(e.target.value)}
                                                 style={{ paddingLeft: 35 }}
@@ -171,6 +225,7 @@ export default function AdminPage() {
                                                 <th style={{ padding: 12, textAlign: 'right' }}>Toplam</th>
                                                 <th style={{ padding: 12, textAlign: 'right' }}>Ödenen</th>
                                                 <th style={{ padding: 12, textAlign: 'right' }}>Kalan</th>
+                                                <th style={{ padding: 12 }}>Personel</th>
                                                 <th style={{ padding: 12, textAlign: 'center' }}>İşlem</th>
                                             </tr>
                                         </thead>
@@ -195,6 +250,9 @@ export default function AdminPage() {
                                                         </td>
                                                         <td style={{ padding: 12, textAlign: 'right', color: remaining > 0 ? '#ef4444' : '#6b7280', fontWeight: 600 }}>
                                                             {remaining.toLocaleString('tr-TR')} ₺
+                                                        </td>
+                                                        <td style={{ padding: 12, fontSize: 12, color: '#666' }}>
+                                                            {rec.createdBy || '-'}
                                                         </td>
                                                         <td style={{ padding: 12, textAlign: 'center' }}>
                                                             <button
@@ -267,76 +325,91 @@ export default function AdminPage() {
                             </div>
                         )}
 
-                        {activeTab === 'shares' && (
+                        {activeTab === 'users' && isAdmin && (
                             <div className="card">
-                                <h3 style={{ marginBottom: 15 }}>Hisse Tipleri Yönetimi</h3>
+                                <h3 style={{ marginBottom: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <FiUserPlus /> Yeni Personel Ekle
+                                </h3>
+                                <div className="form-row" style={{ background: '#f8fafc', padding: 15, borderRadius: 8, marginBottom: 20 }}>
+                                    <div className="form-group">
+                                        <label className="form-label">Ad Soyad</label>
+                                        <input className="form-input" value={newUserName} onChange={e => setNewUserName(e.target.value)} placeholder="Örn: Ahmet Yılmaz" />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Kullanıcı Adı</label>
+                                        <input className="form-input" value={newUserUsername} onChange={e => setNewUserUsername(e.target.value)} placeholder="ahmet123" />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Şifre</label>
+                                        <input className="form-input" value={newUserPassword} onChange={e => setNewUserPassword(e.target.value)} type="text" placeholder="123456" />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Yetki</label>
+                                        <select className="form-select" value={newUserRole} onChange={e => setNewUserRole(e.target.value as UserRole)}>
+                                            <option value="employee">Çalışan</option>
+                                            <option value="admin">Yönetici</option>
+                                        </select>
+                                    </div>
+                                    <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
+                                        <button className="btn btn-primary" onClick={handleAddUser} disabled={saving} style={{ height: 42 }}>
+                                            <FiPlus /> Ekle
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <h3>Sistemdeki Personeller</h3>
                                 <div style={{ overflowX: 'auto' }}>
                                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                         <thead>
                                             <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
-                                                <th style={{ padding: 10 }}>Ad</th>
-                                                <th style={{ padding: 10 }}>Fiyat</th>
-                                                <th style={{ padding: 10 }}>KG Aralığı</th>
+                                                <th style={{ padding: 10 }}>Ad Soyad</th>
+                                                <th style={{ padding: 10 }}>Kullanıcı Adı</th>
+                                                <th style={{ padding: 10 }}>Yetki</th>
+                                                <th style={{ padding: 10 }}>Durum</th>
                                                 <th style={{ padding: 10 }}>İşlem</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {shareTypes.map((st) => (
-                                                <tr key={st.id} style={{ borderBottom: '1px solid #eee' }}>
-                                                    <td style={{ padding: 10 }}>{st.name}</td>
-                                                    <td style={{ padding: 10 }}>{st.price.toLocaleString('tr-TR')} ₺</td>
-                                                    <td style={{ padding: 10 }}>{st.minKg} - {st.maxKg} KG</td>
+                                            {users.map(u => (
+                                                <tr key={u.id} style={{ borderBottom: '1px solid #eee' }}>
+                                                    <td style={{ padding: 10, fontWeight: 500 }}>{u.fullName}</td>
+                                                    <td style={{ padding: 10 }}>{u.username}</td>
                                                     <td style={{ padding: 10 }}>
-                                                        <button className="btn btn-icon btn-danger btn-sm" onClick={() => handleDeleteShareType(st.id)}>
-                                                            <FiTrash2 />
-                                                        </button>
+                                                        <span className={`badge ${u.role === 'admin' ? 'badge-primary' : 'badge-ghost'}`}>
+                                                            {u.role === 'admin' ? 'Yönetici' : 'Çalışan'}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ padding: 10 }}>
+                                                        <span className={`badge ${u.isActive ? 'badge-success' : 'badge-danger'}`}>
+                                                            {u.isActive ? 'Aktif' : 'Pasif'}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ padding: 10 }}>
+                                                        <div style={{ display: 'flex', gap: 5 }}>
+                                                            <button
+                                                                className={`btn btn-sm ${u.isActive ? 'btn-outline-danger' : 'btn-outline-success'}`}
+                                                                onClick={() => handleToggleUser(u)}
+                                                                title={u.isActive ? 'Pasife Al' : 'Aktife Al'}
+                                                            >
+                                                                {u.isActive ? <FiUserX /> : <FiUserCheck />}
+                                                            </button>
+                                                            {u.id !== user?.id && (
+                                                                <button
+                                                                    className="btn btn-sm btn-icon btn-danger"
+                                                                    onClick={async () => {
+                                                                        if (confirm('Silinsin mi?')) {
+                                                                            await deleteUser(u.id);
+                                                                            loadData();
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <FiTrash2 />
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))}
-                                            <tr style={{ background: '#f0f9ff' }}>
-                                                <td style={{ padding: 10 }}>
-                                                    <input
-                                                        className="form-input"
-                                                        placeholder="Örn: Büyükbaş 1/7"
-                                                        value={newShareName}
-                                                        onChange={e => setNewShareName(e.target.value)}
-                                                    />
-                                                </td>
-                                                <td style={{ padding: 10 }}>
-                                                    <input
-                                                        type="number"
-                                                        className="form-input"
-                                                        placeholder="Fiyat"
-                                                        value={newSharePrice}
-                                                        onChange={e => setNewSharePrice(e.target.value)}
-                                                    />
-                                                </td>
-                                                <td style={{ padding: 10 }}>
-                                                    <div style={{ display: 'flex', gap: 5 }}>
-                                                        <input
-                                                            type="number"
-                                                            className="form-input"
-                                                            placeholder="Min"
-                                                            style={{ width: 60 }}
-                                                            value={newShareMinKg}
-                                                            onChange={e => setNewShareMinKg(e.target.value)}
-                                                        />
-                                                        <input
-                                                            type="number"
-                                                            className="form-input"
-                                                            placeholder="Max"
-                                                            style={{ width: 60 }}
-                                                            value={newShareMaxKg}
-                                                            onChange={e => setNewShareMaxKg(e.target.value)}
-                                                        />
-                                                    </div>
-                                                </td>
-                                                <td style={{ padding: 10 }}>
-                                                    <button className="btn btn-primary btn-sm" onClick={handleAddShareType} disabled={saving}>
-                                                        <FiPlus /> Ekle
-                                                    </button>
-                                                </td>
-                                            </tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -359,85 +432,6 @@ export default function AdminPage() {
         );
     }
 
-    return (
-        <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            height: '100vh',
-            backgroundColor: '#f5f7fa'
-        }}>
-            <form onSubmit={handleSubmit} style={{
-                background: 'white',
-                padding: '40px',
-                borderRadius: '8px',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                width: '100%',
-                maxWidth: '400px'
-            }}>
-                <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                    <div style={{
-                        background: '#e3f2fd',
-                        width: '60px',
-                        height: '60px',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        margin: '0 auto 10px',
-                        color: '#1976d2',
-                        fontSize: '24px'
-                    }}>
-                        <FiLock />
-                    </div>
-                    <h2 style={{ margin: 0, color: '#333' }}>Yönetici Girişi</h2>
-                </div>
-
-                {error && (
-                    <div style={{
-                        background: '#ffebee',
-                        color: '#c62828',
-                        padding: '10px',
-                        borderRadius: '4px',
-                        marginBottom: '15px',
-                        fontSize: '14px',
-                        textAlign: 'center'
-                    }}>
-                        {error}
-                    </div>
-                )}
-
-                <div className="form-group" style={{ marginBottom: '20px' }}>
-                    <label style={{ display: 'block', marginBottom: '5px', color: '#555' }}>Şifre</label>
-                    <input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        style={{
-                            width: '100%',
-                            padding: '10px',
-                            border: '1px solid #ddd',
-                            borderRadius: '4px',
-                            fontSize: '16px'
-                        }}
-                        placeholder="Admin şifresi..."
-                    />
-                </div>
-
-                <button type="submit" style={{
-                    width: '100%',
-                    padding: '12px',
-                    background: '#1976d2',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    fontSize: '16px',
-                    fontWeight: 'bold',
-                    cursor: 'pointer'
-                }}>
-                    Giriş Yap
-                </button>
-            </form>
-        </div>
-    );
+    if (authLoading) return <div className="loading">Yükleniyor...</div>;
+    return null;
 }

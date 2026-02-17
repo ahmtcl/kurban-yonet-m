@@ -52,6 +52,7 @@ export default function KayitlarPage() {
             const matchSearch = !search ||
                 r.ownerName.toLowerCase().includes(search.toLowerCase()) ||
                 r.phone.includes(search) ||
+                (r.orderNumber && r.orderNumber.toString().includes(search)) ||
                 r.notes?.toLowerCase().includes(search.toLowerCase());
             const matchShare = !filterShareType || r.shareTypeId === filterShareType;
             const matchPayment = !filterPayment || r.paymentType === filterPayment;
@@ -343,7 +344,7 @@ export default function KayitlarPage() {
                     <div className="search-input" style={{ minWidth: 200, flex: 1 }}>
                         <FiSearch className="search-icon" />
                         <input
-                            placeholder="Ad soyad, telefon veya açıklama ile ara..."
+                            placeholder="İsim, telefon, sipariş no veya açıklama ile ara..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
@@ -418,9 +419,10 @@ export default function KayitlarPage() {
                                 <th>Ad Soyad</th>
                                 <th>Telefon / Yedek</th>
                                 <th>Hisse / Grup</th>
-                                <th>Gün</th>
+                                <th>Kesim Günü</th>
                                 <th>Toplam</th>
                                 <th>Ödenen / Kalan</th>
+                                <th>Personel</th>
                                 <th>Ödeme Türü</th>
                                 <th>Vade</th>
                                 <th>Açıklama</th>
@@ -476,6 +478,9 @@ export default function KayitlarPage() {
                                         <td>
                                             <div style={{ color: 'var(--accent-success)', fontSize: 13 }}>{r.depositAmount.toLocaleString('tr-TR')} ₺</div>
                                             {kalan > 0 && <div style={{ color: 'var(--accent-danger)', fontSize: 12, fontWeight: 500 }}>Kalan: {kalan.toLocaleString('tr-TR')} ₺</div>}
+                                        </td>
+                                        <td style={{ fontSize: 12, color: '#666' }}>
+                                            {r.createdBy || '-'}
                                         </td>
                                         <td style={{ fontSize: 13, fontWeight: 500 }}>
                                             {r.paymentType === 'nakit' ? 'Nakit' :

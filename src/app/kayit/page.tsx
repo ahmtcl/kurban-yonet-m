@@ -7,6 +7,7 @@ import { getShareTypes, getGroups, getSettings, addRecord, addGroup, addMemberTo
 import type { ShareType, Group, Settings, PaymentType, Record } from '@/types';
 import { generateReceipt } from '@/utils/pdfGenerator';
 import { sendSMS, generateOTP } from '@/utils/sms';
+import { useAuth } from '@/context/AuthContext';
 
 export default function YeniKayit() {
     const router = useRouter();
@@ -16,6 +17,8 @@ export default function YeniKayit() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [toast, setToast] = useState<{ type: string; message: string } | null>(null);
+
+    const { user, loading: authLoading } = useAuth();
 
     // Form state
     const [ownerName, setOwnerName] = useState('');
@@ -46,6 +49,12 @@ export default function YeniKayit() {
     const [otpSent, setOtpSent] = useState(false);
     const [serverOtp, setServerOtp] = useState('');
     const [userOtp, setUserOtp] = useState('');
+
+    useEffect(() => {
+        if (!authLoading && !user) {
+            router.push('/login');
+        }
+    }, [user, authLoading]);
 
     useEffect(() => {
         loadData();
@@ -150,7 +159,8 @@ export default function YeniKayit() {
                 notes,
                 smsVerified: true,
                 status: 'waiting_approval' as const,
-                createdBy: 'admin',
+                createdBy: user?.fullName || 'Bilinmiyor',
+                createdById: user?.id || '',
             };
 
             const docRef = await addRecord(newRecordData);
@@ -244,7 +254,8 @@ export default function YeniKayit() {
 
     const assignedGroup = groups.find(g => g.id === assignedGroupId);
 
-    if (loading) return <div className="loading">Yükleniyor...</div>;
+    if (loading || authLoading) return <div className="loading">Yükleniyor...</div>;
+    if (!user) return null;
 
     return (
         <>

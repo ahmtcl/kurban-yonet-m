@@ -9,6 +9,8 @@ import { getRecords, getShareTypes, getSettings } from '@/lib/firestore';
 import type { Record as RecordType, ShareType, Settings } from '@/types';
 import RecordEditModal from '@/components/modals/RecordEditModal';
 import DueRecordsModal from '@/components/modals/DueRecordsModal';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 
 const CHART_COLORS = ['#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd', '#e0e7ff'];
 
@@ -18,9 +20,18 @@ export default function Dashboard() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+
   // Modals
   const [showDueModal, setShowDueModal] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<RecordType | null>(null);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, authLoading]);
 
   useEffect(() => {
     loadData();
@@ -95,17 +106,20 @@ export default function Dashboard() {
   todayStart.setHours(0, 0, 0, 0);
   const buyukbasToday = buyukbasRecords.filter(r => {
     if (!r.createdAt) return false;
-    const recordDate = r.createdAt.toDate ? r.createdAt.toDate() : new Date(r.createdAt);
+    // Handle both Firestore Timestamp and JS Date
+    const recordDate = (r.createdAt as any).toDate ? (r.createdAt as any).toDate() : new Date(r.createdAt);
     return recordDate >= todayStart;
   }).length;
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="loading">
         <div className="spinner" />
       </div>
     );
   }
+
+  if (!user) return null;
 
   return (
     <>

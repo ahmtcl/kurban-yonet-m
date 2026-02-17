@@ -8,6 +8,18 @@ export interface ShareType {
     createdAt: Date;
 }
 
+export type UserRole = 'admin' | 'employee';
+
+export interface User {
+    id: string;
+    username: string;
+    password?: string;
+    fullName: string;
+    role: UserRole;
+    isActive: boolean;
+    createdAt: Date;
+}
+
 export type PaymentType = 'nakit' | 'kredi_karti' | 'havale' | 'online_kredi_karti' | 'teslimatta';
 
 export interface Record {
@@ -29,7 +41,8 @@ export interface Record {
     status: 'waiting_approval' | 'approved'; // Added status
     createdAt: Date;
     updatedAt?: Date; // Added updatedAt
-    createdBy: string;
+    createdBy: string; // Full name of creator
+    createdById?: string; // ID of creator
 }
 
 export interface Group {

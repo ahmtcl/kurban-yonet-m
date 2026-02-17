@@ -11,8 +11,10 @@ import {
     FiSettings,
     FiTag,
     FiRefreshCw,
+    FiLogOut
 } from 'react-icons/fi';
 import { GiCow } from 'react-icons/gi';
+import { useAuth } from '@/context/AuthContext';
 
 const navItems = [
     { href: '/', label: 'Ana Sayfa', icon: <FiHome /> },
@@ -21,11 +23,12 @@ const navItems = [
     { href: '/kayitlar', label: 'Kayıtlar', icon: <FiList /> },
     { href: '/hisselendirme', label: 'Hisselendirme', icon: <FiTag /> },
     { href: '/raporlar', label: 'Raporlar', icon: <FiBarChart2 /> },
-    { href: '/admin', label: 'Admin Panel', icon: <FiSettings /> },
+    { href: '/admin', label: 'Admin Panel', icon: <FiSettings />, adminOnly: true },
 ];
 
 export default function Sidebar() {
     const pathname = usePathname();
+    const { isAdmin, user, logout } = useAuth();
 
     return (
         <aside className="sidebar">
@@ -37,6 +40,8 @@ export default function Sidebar() {
             </div>
             <nav className="sidebar-nav">
                 {navItems.map((item) => {
+                    if (item.adminOnly && !isAdmin) return null;
+
                     const isActive =
                         item.href === '/'
                             ? pathname === '/'
@@ -53,7 +58,7 @@ export default function Sidebar() {
                     );
                 })}
             </nav>
-            <div style={{ padding: '12px' }}>
+            <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <button
                     className="btn btn-ghost"
                     style={{ width: '100%', justifyContent: 'center' }}
@@ -61,6 +66,15 @@ export default function Sidebar() {
                 >
                     <FiRefreshCw /> Yenile (F5)
                 </button>
+                {user && (
+                    <button
+                        className="btn btn-outline-danger"
+                        style={{ width: '100%', justifyContent: 'center' }}
+                        onClick={() => logout()}
+                    >
+                        <FiLogOut /> Çıkış Yap
+                    </button>
+                )}
             </div>
         </aside>
     );

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { FiX, FiCheck, FiDownload, FiTrash2, FiShield } from 'react-icons/fi';
 import { updateRecord, deleteRecord, getSettings, getShareTypes, getGroups, addMemberToGroup, removeMemberFromGroup } from '@/lib/firestore'; // Added group utils
 import type { Record as RecordType, PaymentType, Settings, ShareType, Group } from '@/types';
 import { generateReceipt } from '@/utils/pdfGenerator';
-import { useAdmin } from '@/context/AdminContext';
+import { useAuth } from '@/context/AuthContext';
 import { sendSMS, generateOTP } from '@/utils/sms';
+import { FiX, FiCheck, FiDownload, FiTrash2, FiShield, FiUser } from 'react-icons/fi';
 
 interface RecordEditModalProps {
     record: RecordType | null;
@@ -14,7 +14,7 @@ interface RecordEditModalProps {
 }
 
 export default function RecordEditModal({ record, onClose, onSave, isAdminView = false }: RecordEditModalProps) {
-    const { isAdmin } = useAdmin();
+    const { isAdmin } = useAuth();
     const [editRecord, setEditRecord] = useState<RecordType | null>(null);
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -335,6 +335,23 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
                                 * Sadece <strong>{editRecord.shareTypeName}</strong> hissesine uygun gruplar listelenmektedir.
                             </p>
                         </div>
+
+                        {isAdminView && (
+                            <div style={{ padding: '10px 15px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <FiUser style={{ color: '#1976d2' }} />
+                                <span style={{ fontSize: 13, color: '#64748b' }}>
+                                    Bu siparişi <strong>{record.createdBy || 'Bilinmiyor'}</strong> oluşturdu.
+                                </span>
+                            </div>
+                        )}
+
+                        {!isAdminView && record.createdBy && (
+                            <div style={{ textAlign: 'center', marginBottom: 20, padding: 10, background: '#f0f9ff', borderRadius: 8 }}>
+                                <span style={{ fontSize: 13, color: '#0d47a1', fontWeight: 500 }}>
+                                    İşleminizi Gerçekleştiren: <strong>{record.createdBy}</strong>
+                                </span>
+                            </div>
+                        )}
 
                         <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
                             <div style={{ display: 'flex', gap: 10 }}>

@@ -15,7 +15,7 @@ import {
     runTransaction, // Added runTransaction
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { ShareType, Record, Group, Settings, PaymentType } from '@/types';
+import type { ShareType, Record, Group, Settings, PaymentType, User } from '@/types';
 
 // ===== SHARE TYPES =====
 export async function getShareTypes(): Promise<ShareType[]> {
@@ -78,6 +78,7 @@ export async function getRecords(): Promise<Record[]> {
         createdAt: d.data().createdAt?.toDate?.() || new Date(),
         updatedAt: d.data().updatedAt?.toDate?.() || null, // Added updatedAt
         createdBy: d.data().createdBy || '',
+        createdById: d.data().createdById || '',
     }));
 }
 
@@ -248,6 +249,7 @@ export async function getGroupMembers(groupId: string): Promise<Record[]> {
         createdAt: d.data().createdAt?.toDate?.() || new Date(),
         updatedAt: d.data().updatedAt?.toDate?.() || null,
         createdBy: d.data().createdBy || '',
+        createdById: d.data().createdById || '',
     }));
 }
 
@@ -274,4 +276,39 @@ export async function getSettings(): Promise<Settings> {
 
 export async function updateSettings(data: Partial<Settings>) {
     return setDoc(doc(db, 'settings', 'general'), data, { merge: true });
+}
+
+// ===== USERS =====
+export async function getUsers(): Promise<User[]> {
+    const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(widow => ({
+        id: widow.id,
+        ...widow.data(),
+        createdAt: widow.data().createdAt?.toDate?.() || new Date(),
+    } as User));
+}
+
+export async function addUser(user: Omit<User, 'id' | 'createdAt'>) {
+    return addDoc(collection(db, 'users'), {
+        ...user,
+        createdAt: serverTimestamp(),
+    });
+}
+
+export async function updateUser(id: string, user: Partial<User>) {
+    const { id: _, createdAt, ...rest } = user as User;
+    return updateDoc(doc(db, 'users', id), rest);
+}
+
+export async function deleteUser(id: string) {
+    return deleteDoc(doc(db, 'users', id));
+}
+
+export async function getUserByUsername(username: string): Promise<User | null> {
+    const q = query(collection(db, 'users'), where('username', '==', username), where('isActive', '==', true));
+    const snap = await getDocs(q);
+    if (snap.empty) return null;
+    const doc = snap.docs[0];
+    return { id: doc.id, ...doc.data(), createdAt: doc.data().createdAt?.toDate?.() || new Date() } as User;
 }
