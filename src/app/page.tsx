@@ -75,9 +75,29 @@ export default function Dashboard() {
   });
 
   const pieData = shareBreakdown.filter((s) => s.count > 0);
+
+  // Custom logic for "Büyükbaş" target tracking
+  const buyukbasRecords = records.filter(r => r.shareTypeName?.toLowerCase().includes('büyükbaş'));
+  const buyukbasCount = buyukbasRecords.length;
+
   const targetCount = settings?.targetCount || 100;
-  const currentCount = records.length;
-  const targetPercentage = Math.min(100, (currentCount / targetCount) * 100);
+  const targetPercentage = Math.min(100, (buyukbasCount / targetCount) * 100);
+
+  const targetDate = new Date('2026-05-27');
+  const today = new Date();
+  const diffTime = targetDate.getTime() - today.getTime();
+  const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const remainingCount = Math.max(0, targetCount - buyukbasCount);
+  const dailyTarget = daysLeft > 0 ? (remainingCount / daysLeft).toFixed(1) : 0;
+
+  // New: Today's sales calculation
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const buyukbasToday = buyukbasRecords.filter(r => {
+    if (!r.createdAt) return false;
+    const recordDate = r.createdAt.toDate ? r.createdAt.toDate() : new Date(r.createdAt);
+    return recordDate >= todayStart;
+  }).length;
 
   if (loading) {
     return (
@@ -108,8 +128,8 @@ export default function Dashboard() {
           {/* Total Shares & Target Progress */}
           <div className="stat-card primary" style={{ background: 'linear-gradient(135deg, #e0e7ff 0%, #ffffff 100%)' }}>
             <div className="stat-icon"><GiCow /></div>
-            <div className="stat-value" style={{ color: '#4338ca' }}>{currentCount}</div>
-            <div className="stat-label">Toplam Hissedar</div>
+            <div className="stat-value" style={{ color: '#4338ca' }}>{buyukbasCount}</div>
+            <div className="stat-label">Toplam Büyükbaş</div>
 
             {/* Target Progress Bar */}
             <div style={{ marginTop: 10 }}>
@@ -125,8 +145,8 @@ export default function Dashboard() {
                   transition: 'width 0.5s ease-out'
                 }} />
               </div>
-              <div style={{ fontSize: 11, color: '#666', marginTop: 4, textAlign: 'right' }}>
-                {Math.max(0, targetCount - currentCount)} kişi kaldı
+              <div style={{ fontSize: 13, color: '#dc2626', marginTop: 8, textAlign: 'right', fontWeight: 'bold' }}>
+                HEDEF: {dailyTarget} / BUGÜN: {buyukbasToday}
               </div>
             </div>
           </div>

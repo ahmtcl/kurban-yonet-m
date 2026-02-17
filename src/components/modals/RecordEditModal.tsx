@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { FiX, FiCheck, FiDownload, FiTrash2, FiShield } from 'react-icons/fi';
-import { updateRecord, deleteRecord, getSettings, getShareTypes } from '@/lib/firestore'; // Added deleteRecord
-import type { Record as RecordType, PaymentType, Settings, ShareType } from '@/types';
+import { updateRecord, deleteRecord, getSettings, getShareTypes, getGroups, addMemberToGroup, removeMemberFromGroup } from '@/lib/firestore'; // Added group utils
+import type { Record as RecordType, PaymentType, Settings, ShareType, Group } from '@/types';
 import { generateReceipt } from '@/utils/pdfGenerator';
-import { useAdmin } from '@/context/AdminContext'; // Added useAdmin
-import { sendSMS, generateOTP } from '@/utils/sms'; // Added SMS utils
+import { useAdmin } from '@/context/AdminContext';
+import { sendSMS, generateOTP } from '@/utils/sms';
 
 interface RecordEditModalProps {
     record: RecordType | null;
@@ -20,6 +20,8 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
     const [deleting, setDeleting] = useState(false);
     const [settings, setSettings] = useState<Settings | null>(null);
     const [shareTypes, setShareTypes] = useState<ShareType[]>([]);
+    const [groups, setGroups] = useState<Group[]>([]);
+    const [selectedGroupId, setSelectedGroupId] = useState<string>('');
 
     // OTP State
     const [otpSent, setOtpSent] = useState(false);
@@ -34,6 +36,8 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
         // Fetch settings for receipt generation
         getSettings().then(setSettings).catch(console.error);
         getShareTypes().then(setShareTypes).catch(console.error);
+        getGroups().then(setGroups).catch(console.error);
+        setSelectedGroupId(record.groupId || '');
     }, [record]);
 
     if (!editRecord || !record) return null;
@@ -102,7 +106,20 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
                 dueDate: editRecord.dueDate,
                 daySelection: editRecord.daySelection,
                 status: editRecord.status,
+                groupId: selectedGroupId || null,
             });
+
+            // Handle Group Membership Changes
+            if (selectedGroupId !== (record?.groupId || '')) {
+                // 1. Remove from old group if existed
+                if (record?.groupId) {
+                    await removeMemberFromGroup(record.groupId, record.id);
+                }
+                // 2. Add to new group if selected
+                if (selectedGroupId) {
+                    await addMemberToGroup(selectedGroupId, record!.id);
+                }
+            }
 
             // Send Confirmation SMS if not in Admin View (i.e., triggered by OTP flow)
             if (!isAdminView) {
@@ -294,6 +311,29 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
                                 value={editRecord.notes}
                                 onChange={(e) => setEditRecord({ ...editRecord, notes: e.target.value })}
                             />
+                        </div>
+
+                        <div className="form-group" style={{ marginBottom: 20 }}>
+                            <label className="form-label" style={{ fontWeight: 600 }}>Grup Ataması</label>
+                            <select
+                                className="form-select"
+                                value={selectedGroupId}
+                                onChange={(e) => setSelectedGroupId(e.target.value)}
+                                style={{ border: '1px solid var(--accent-primary)', backgroundColor: '#f0f9ff' }}
+                            >
+                                <option value="">--- Gruptan Çıkar / Grupsuz ---</option>
+                                {groups
+                                    .filter(g => g.shareTypeId === editRecord.shareTypeId)
+                                    .map(g => (
+                                        <option key={g.id} value={g.id}>
+                                            {g.name} ({g.memberIds.length} Üye)
+                                        </option>
+                                    ))
+                                }
+                            </select>
+                            <p style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
+                                * Sadece <strong>{editRecord.shareTypeName}</strong> hissesine uygun gruplar listelenmektedir.
+                            </p>
                         </div>
 
                         <div className="modal-footer" style={{ justifyContent: 'space-between' }}>

@@ -21,6 +21,13 @@ export default function GruplarPage() {
     const [moveRecord, setMoveRecord] = useState<{ record: Record; currentGroupId: string } | null>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<{ groupId: string; recordId: string } | null>(null);
     const [addMemberGroup, setAddMemberGroup] = useState<Group | null>(null);
+    const [showBulkGroupModal, setShowBulkGroupModal] = useState(false);
+
+    // Unassigned List State
+    const [unassignedSearch, setUnassignedSearch] = useState('');
+    const [selectedUnassignedIds, setSelectedUnassignedIds] = useState<string[]>([]);
+    const [newGroupName, setNewGroupName] = useState('');
+    const [newGroupShareType, setNewGroupShareType] = useState('');
 
     // Group Edit
     const [editingGroup, setEditingGroup] = useState<Group | null>(null);
@@ -79,9 +86,6 @@ export default function GruplarPage() {
     async function handleDeleteGroup(id: string) {
         if (!confirm('Bu grubu silmek istediğinize emin misiniz? Grup üyeleri silinmeyecek, sadece gruptan çıkarılacaktır.')) return;
         try {
-            // Optional: Remove group ID from all members (backend trigger better, but manual here)
-            // For now just delete group container. 
-            // Better UX: Iterate members and set groupId = null.
             const group = groups.find(g => g.id === id);
             if (group && group.memberIds.length > 0) {
                 await Promise.all(group.memberIds.map(mid => updateRecord(mid, { groupId: null })));
@@ -94,6 +98,43 @@ export default function GruplarPage() {
             alert('Grup silinemedi.');
         }
     }
+
+    async function handleBulkCreateGroup() {
+        if (!newGroupName.trim() || !newGroupShareType || selectedUnassignedIds.length === 0) return;
+        try {
+            const st = shareTypes.find(s => s.id === newGroupShareType);
+            const { addGroup, addMemberToGroup } = await import('@/lib/firestore');
+
+            const groupRef = await addGroup({
+                name: newGroupName.trim(),
+                shareTypeId: newGroupShareType,
+                shareTypeName: st?.name || '',
+                description: `${selectedUnassignedIds.length} kişi ile oluşturuldu.`,
+                memberIds: []
+            });
+
+            await Promise.all(selectedUnassignedIds.map(async (rid) => {
+                await updateRecord(rid, { groupId: groupRef.id });
+                await addMemberToGroup(groupRef.id, rid);
+            }));
+
+            setShowBulkGroupModal(false);
+            setSelectedUnassignedIds([]);
+            setNewGroupName('');
+            setRefreshTrigger(prev => prev + 1);
+            alert('Yeni grup oluşturuldu ve üyeler atandı!');
+        } catch (error) {
+            console.error(error);
+            alert('Hata oluştu.');
+        }
+    }
+
+    // Unassigned Shareholders
+    const unassignedShareholders = records.filter(r => !r.groupId || r.groupId === '');
+    const filteredUnassigned = unassignedShareholders.filter(r =>
+        r.ownerName.toLowerCase().includes(unassignedSearch.toLowerCase()) ||
+        (r.phone && r.phone.includes(unassignedSearch))
+    );
 
     // Grouping logic
     const groupsByShareType = shareTypes.map(st => {
@@ -124,6 +165,75 @@ export default function GruplarPage() {
             </div>
 
             <div className="page-content" style={{ paddingBottom: 50 }}>
+                {/* UNASSIGNED SECTION */}
+                <div className="card" style={{ marginBottom: 40, border: '2px dashed var(--accent-primary)', background: '#f0f9ff' }}>
+                    <div style={{ padding: 16, borderBottom: '1px solid #e0f2fe', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h3 style={{ margin: 0, color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                            📌 Gruplandırılmamış Hissedarlar ({unassignedShareholders.length})
+                        </h3>
+                        {selectedUnassignedIds.length > 0 && (
+                            <button className="btn btn-success btn-sm" onClick={() => setShowBulkGroupModal(true)}>
+                                <FiPlus /> Seçilenlerden Grup Oluştur ({selectedUnassignedIds.length})
+                            </button>
+                        )}
+                    </div>
+                    <div style={{ padding: 16 }}>
+                        <div className="form-group" style={{ maxWidth: 400, marginBottom: 15 }}>
+                            <input
+                                className="form-input"
+                                placeholder="Grupsuzlar içinde ara..."
+                                value={unassignedSearch}
+                                onChange={(e) => setUnassignedSearch(e.target.value)}
+                            />
+                        </div>
+                        <div style={{
+                            maxHeight: 300,
+                            overflowY: 'auto',
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+                            gap: 10
+                        }}>
+                            {filteredUnassigned.map(r => (
+                                <label key={r.id} style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 10,
+                                    padding: '8px 12px',
+                                    border: '1px solid #e0f2fe',
+                                    borderRadius: 6,
+                                    background: selectedUnassignedIds.includes(r.id) ? '#dbeffe' : '#fff',
+                                    cursor: 'pointer'
+                                }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedUnassignedIds.includes(r.id)}
+                                        onChange={(e) => {
+                                            if (e.target.checked) setSelectedUnassignedIds([...selectedUnassignedIds, r.id]);
+                                            else setSelectedUnassignedIds(selectedUnassignedIds.filter(id => id !== r.id));
+                                        }}
+                                    />
+                                    <div style={{ overflow: 'hidden' }}>
+                                        <div style={{ fontWeight: 600, fontSize: 13, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{r.ownerName}</div>
+                                        <div style={{ fontSize: 11, color: '#666' }}>{r.shareTypeName}</div>
+                                    </div>
+                                    <button
+                                        className="btn btn-icon btn-ghost btn-sm"
+                                        style={{ marginLeft: 'auto', padding: 2 }}
+                                        onClick={(e) => { e.preventDefault(); setEditRecord(r); }}
+                                    >
+                                        <FiEdit />
+                                    </button>
+                                </label>
+                            ))}
+                            {filteredUnassigned.length === 0 && (
+                                <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 20, color: '#999', fontStyle: 'italic' }}>
+                                    Gruplandırılacak hissedar bulunamadı.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
                 {groupsByShareType.map(({ shareType, groups: typeGroups, stats }) => (
                     <div key={shareType.id} style={{ marginBottom: 40 }}>
                         {/* Header with Stats */}
@@ -349,6 +459,60 @@ export default function GruplarPage() {
                     onSuccess={() => setRefreshTrigger(prev => prev + 1)}
                 />
             )}
+
+            {/* Bulk Group Modal */}
+            {showBulkGroupModal && (
+                <div className="modal-backdrop" onClick={() => setShowBulkGroupModal(false)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3>Seçilenlerden Yeni Grup Oluştur</h3>
+                            <button className="btn btn-icon btn-ghost" onClick={() => setShowBulkGroupModal(false)}><FiX /></button>
+                        </div>
+                        <div className="modal-body">
+                            <p style={{ marginBottom: 20, fontSize: 14 }}>
+                                Seçilen <strong>{selectedUnassignedIds.length}</strong> hissedar için yeni bir grup oluşturulacaktır.
+                            </p>
+                            <div className="form-group">
+                                <label className="form-label">Grup Adı</label>
+                                <input
+                                    className="form-input"
+                                    placeholder="Örn: 2. Gün B Grubu"
+                                    value={newGroupName}
+                                    onChange={(e) => setNewGroupName(e.target.value)}
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Hisse Tipi</label>
+                                <select
+                                    className="form-select"
+                                    value={newGroupShareType}
+                                    onChange={(e) => setNewGroupShareType(e.target.value)}
+                                >
+                                    <option value="">Seçiniz...</option>
+                                    {shareTypes.map(st => (
+                                        <option key={st.id} value={st.id}>{st.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-ghost" onClick={() => setShowBulkGroupModal(false)}>İptal</button>
+                            <button
+                                className="btn btn-success"
+                                onClick={handleBulkCreateGroup}
+                                disabled={!newGroupName.trim() || !newGroupShareType}
+                            >
+                                Grubu Oluştur ve Kaydet
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Reuse FiX from elsewhere in icons if needed */}
+            <style jsx>{`
+                .modal-backdrop { z-index: 1000; }
+            `}</style>
         </>
     );
 }
