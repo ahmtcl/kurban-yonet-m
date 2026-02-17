@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { FiLock, FiSettings, FiTag, FiLogOut, FiSave, FiPlus, FiTrash2, FiList, FiSearch, FiEdit, FiUsers, FiUserPlus, FiUserCheck, FiUserX } from 'react-icons/fi';
-import { getSettings, updateSettings, getShareTypes, addShareType, deleteShareType, getRecords, getUsers, addUser, updateUser, deleteUser } from '@/lib/firestore';
-import type { Settings, ShareType, Record as RecordType, User, UserRole } from '@/types';
+import { getSettings, updateSettings, getShareTypes, addShareType, deleteShareType, getRecords, getUsers, addUser, updateUser, deleteUser, getGroups } from '@/lib/firestore';
+import type { Settings, ShareType, Record as RecordType, User, UserRole, Group } from '@/types';
 import RecordEditModal from '@/components/modals/RecordEditModal';
 import { useRouter } from 'next/navigation';
 
@@ -20,6 +20,7 @@ export default function AdminPage() {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [groups, setGroups] = useState<Group[]>([]);
 
     // Search & Edit State
     const [searchQuery, setSearchQuery] = useState('');
@@ -46,16 +47,18 @@ export default function AdminPage() {
     async function loadData() {
         setLoading(true);
         try {
-            const [s, t, r, u] = await Promise.all([
+            const [s, t, r, u, g] = await Promise.all([
                 getSettings(),
                 getShareTypes(),
                 getRecords(),
-                isAdmin ? getUsers() : Promise.resolve([])
+                isAdmin ? getUsers() : Promise.resolve([]),
+                getGroups()
             ]);
             setSettings(s);
             setShareTypes(t);
             setRecords(r);
             setUsers(u);
+            setGroups(g);
         } catch (e) {
             console.error(e);
         } finally {
@@ -214,60 +217,104 @@ export default function AdminPage() {
                                     </div>
                                 </div>
 
-                                <div style={{ overflowX: 'auto' }}>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <div className="table-container">
+                                    <table>
                                         <thead>
-                                            <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
-                                                <th style={{ padding: 12 }}>Sipariş No</th>
-                                                <th style={{ padding: 12 }}>Hissedar</th>
-                                                <th style={{ padding: 12 }}>Telefon</th>
-                                                <th style={{ padding: 12 }}>Grup / Hisse</th>
-                                                <th style={{ padding: 12, textAlign: 'right' }}>Toplam</th>
-                                                <th style={{ padding: 12, textAlign: 'right' }}>Ödenen</th>
-                                                <th style={{ padding: 12, textAlign: 'right' }}>Kalan</th>
-                                                <th style={{ padding: 12 }}>Personel</th>
-                                                <th style={{ padding: 12, textAlign: 'center' }}>İşlem</th>
+                                            <tr>
+                                                <th>#</th>
+                                                <th>Durum</th>
+                                                <th>Sipariş No</th>
+                                                <th>Sipariş Tarihi</th>
+                                                <th>Ad Soyad</th>
+                                                <th>Telefon / Yedek</th>
+                                                <th>Hisse / Grup</th>
+                                                <th>Kesim Günü</th>
+                                                <th>Toplam</th>
+                                                <th>Ödenen / Kalan</th>
+                                                <th>Personel</th>
+                                                <th>Ödeme Türü</th>
+                                                <th>Vade</th>
+                                                <th>Açıklama</th>
+                                                <th>İşlem</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {filteredRecords.map((rec) => {
-                                                const remaining = (rec.totalPrice || 0) - (rec.depositAmount || 0);
-                                                const shareTypeName = shareTypes.find(t => t.id === rec.shareTypeId)?.name || '-';
+                                            {filteredRecords.length > 0 ? filteredRecords.map((r, i) => {
+                                                const kalan = (r.totalPrice || 0) - r.depositAmount;
+                                                const isOverdue = r.dueDate && new Date(r.dueDate) < new Date() && kalan > 0;
+                                                const group = groups.find(g => g.id === r.groupId);
 
                                                 return (
-                                                    <tr key={rec.id} style={{ borderBottom: '1px solid #eee' }}>
-                                                        <td style={{ padding: 12, fontWeight: 600, color: '#666' }}>#{rec.orderNumber || '-'}</td>
-                                                        <td style={{ padding: 12, fontWeight: 500 }}>{rec.ownerName}</td>
-                                                        <td style={{ padding: 12, color: '#666' }}>{rec.phone}</td>
-                                                        <td style={{ padding: 12 }}>
-                                                            <span className="badge badge-primary">{shareTypeName}</span>
+                                                    <tr key={r.id}>
+                                                        <td style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
+                                                        <td>
+                                                            {r.status === 'approved' ? (
+                                                                <span className="badge badge-success" style={{ fontSize: 11 }}>Onaylandı</span>
+                                                            ) : (
+                                                                <span className="badge badge-warning" style={{ fontSize: 11 }}>Bekliyor</span>
+                                                            )}
                                                         </td>
-                                                        <td style={{ padding: 12, textAlign: 'right', fontWeight: 600 }}>
-                                                            {(rec.totalPrice || 0).toLocaleString('tr-TR')} ₺
+                                                        <td style={{ fontWeight: 600, color: '#666' }}>#{r.orderNumber || '-'}</td>
+                                                        <td style={{ fontSize: 12, color: '#555' }}>
+                                                            {new Date(r.createdAt).toLocaleDateString('tr-TR')}
                                                         </td>
-                                                        <td style={{ padding: 12, textAlign: 'right', color: '#10b981', fontWeight: 600 }}>
-                                                            {(rec.depositAmount || 0).toLocaleString('tr-TR')} ₺
+                                                        <td style={{ fontWeight: 500 }}>
+                                                            {r.ownerName}
                                                         </td>
-                                                        <td style={{ padding: 12, textAlign: 'right', color: remaining > 0 ? '#ef4444' : '#6b7280', fontWeight: 600 }}>
-                                                            {remaining.toLocaleString('tr-TR')} ₺
+                                                        <td>
+                                                            <div style={{ fontSize: 13 }}>{r.phone}</div>
+                                                            {r.phoneBackup && <div style={{ fontSize: 11, color: '#666' }}>Yedek: {r.phoneBackup}</div>}
                                                         </td>
-                                                        <td style={{ padding: 12, fontSize: 12, color: '#666' }}>
-                                                            {rec.createdBy || '-'}
+                                                        <td>
+                                                            <span className="badge badge-primary" style={{ marginBottom: 2, display: 'inline-block' }}>{r.shareTypeName}</span>
+                                                            {group && <div style={{ fontSize: 12, color: '#555' }}>{group.name}</div>}
                                                         </td>
-                                                        <td style={{ padding: 12, textAlign: 'center' }}>
+                                                        <td>
+                                                            <span style={{
+                                                                fontSize: 12,
+                                                                fontWeight: 600,
+                                                                color: r.daySelection === 1 ? '#2e7d32' : '#f57f17',
+                                                                backgroundColor: r.daySelection === 1 ? '#e8f5e9' : '#fffde7',
+                                                                padding: '2px 6px',
+                                                                borderRadius: 4
+                                                            }}>
+                                                                {r.daySelection}. Gün
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ fontWeight: 600 }}>{(r.totalPrice || 0).toLocaleString('tr-TR')} ₺</td>
+                                                        <td>
+                                                            <div style={{ color: 'var(--accent-success)', fontSize: 13 }}>{r.depositAmount.toLocaleString('tr-TR')} ₺</div>
+                                                            {kalan > 0 && <div style={{ color: 'var(--accent-danger)', fontSize: 12, fontWeight: 500 }}>Kalan: {kalan.toLocaleString('tr-TR')} ₺</div>}
+                                                        </td>
+                                                        <td style={{ fontSize: 12, color: '#666' }}>
+                                                            {r.createdBy || '-'}
+                                                        </td>
+                                                        <td style={{ fontSize: 13, fontWeight: 500 }}>
+                                                            {r.paymentType === 'nakit' ? 'Nakit' :
+                                                                r.paymentType === 'kredi_karti' ? 'Kredi Kartı' :
+                                                                    r.paymentType === 'online_kredi_karti' ? 'Online K.K.' :
+                                                                        r.paymentType === 'teslimatta' ? 'Teslimatta' : 'Havale'}
+                                                        </td>
+                                                        <td style={{ color: isOverdue ? 'var(--accent-danger)' : 'var(--text-secondary)', fontSize: 13 }}>
+                                                            {r.dueDate ? new Date(r.dueDate).toLocaleDateString('tr-TR') : '—'}
+                                                        </td>
+                                                        <td style={{ maxWidth: 200 }}>
+                                                            <div style={{ fontSize: 13, color: '#444', maxHeight: 60, overflowY: 'auto' }}>{r.notes || '—'}</div>
+                                                        </td>
+                                                        <td>
                                                             <button
-                                                                className="btn btn-sm btn-outline-primary"
-                                                                onClick={() => setSelectedRecord(rec)}
+                                                                className="btn btn-icon btn-sm btn-ghost"
+                                                                onClick={() => setSelectedRecord({ ...r })}
+                                                                title="Düzenle / Tahsilat"
                                                             >
-                                                                <FiEdit /> Düzenle / Tahsilat
+                                                                <FiEdit />
                                                             </button>
                                                         </td>
                                                     </tr>
                                                 );
-                                            })}
-                                            {filteredRecords.length === 0 && (
+                                            }) : (
                                                 <tr>
-                                                    <td colSpan={7} style={{ padding: 20, textAlign: 'center', color: '#999' }}>
+                                                    <td colSpan={15} style={{ padding: 20, textAlign: 'center', color: '#999' }}>
                                                         Kayıt bulunamadı.
                                                     </td>
                                                 </tr>

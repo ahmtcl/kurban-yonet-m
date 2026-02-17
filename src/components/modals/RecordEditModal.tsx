@@ -4,7 +4,7 @@ import type { Record as RecordType, PaymentType, Settings, ShareType, Group } fr
 import { generateReceipt } from '@/utils/pdfGenerator';
 import { useAuth } from '@/context/AuthContext';
 import { sendSMS, generateOTP } from '@/utils/sms';
-import { FiX, FiCheck, FiDownload, FiTrash2, FiShield, FiUser } from 'react-icons/fi';
+import { FiX, FiCheck, FiDownload, FiTrash2, FiShield, FiUser, FiSend, FiMessageSquare } from 'react-icons/fi';
 
 interface RecordEditModalProps {
     record: RecordType | null;
@@ -28,6 +28,16 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
     const [serverOtp, setServerOtp] = useState('');
     const [userOtp, setUserOtp] = useState('');
 
+    // Custom SMS State
+    const [customMessage, setCustomMessage] = useState('');
+    const [sendingSms, setSendingSms] = useState(false);
+
+    const smsTemplates = [
+        { label: 'Ödeme Hatırlatma', text: `SAYIN ${record?.ownerName}, KURBAN KAYDINIZ ICIN ODEME BEKLENMEKTEDIR. BILGINIZE.` },
+        { label: 'Grup Bilgisi', text: `SAYIN ${record?.ownerName}, KURBAN GRUBUNUZ OLUSTURULMUSTUR. SIPARIS NO: ${record?.orderNumber}.` },
+        { label: 'Kesim Günü', text: `SAYIN ${record?.ownerName}, KURBANINIZ ${record?.daySelection}. GUN KESILECEKTIR.` },
+    ];
+
     useEffect(() => {
         setEditRecord(record);
         setOtpSent(false);
@@ -37,7 +47,7 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
         getSettings().then(setSettings).catch(console.error);
         getShareTypes().then(setShareTypes).catch(console.error);
         getGroups().then(setGroups).catch(console.error);
-        setSelectedGroupId(record.groupId || '');
+        setSelectedGroupId(record?.groupId || '');
     }, [record]);
 
     if (!editRecord || !record) return null;
@@ -162,6 +172,24 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
             generateReceipt(editRecord, settings);
         }
     };
+
+    async function handleSendCustomSms() {
+        const targetPhone = editRecord?.phone || editRecord?.phoneBackup;
+        if (!targetPhone) return alert('Telefon numarası bulunamadı.');
+        if (!customMessage.trim()) return alert('Lütfen mesaj yazın.');
+
+        setSendingSms(true);
+        try {
+            await sendSMS(targetPhone, customMessage);
+            alert('SMS başarıyla gönderildi.');
+            setCustomMessage('');
+        } catch (error) {
+            console.error('Custom SMS error:', error);
+            alert('SMS gönderilemedi.');
+        } finally {
+            setSendingSms(false);
+        }
+    }
 
     return (
         <div className="modal-backdrop" onClick={onClose}>
@@ -345,13 +373,41 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
                             </div>
                         )}
 
-                        {!isAdminView && record.createdBy && (
-                            <div style={{ textAlign: 'center', marginBottom: 20, padding: 10, background: '#f0f9ff', borderRadius: 8 }}>
-                                <span style={{ fontSize: 13, color: '#0d47a1', fontWeight: 500 }}>
-                                    İşleminizi Gerçekleştiren: <strong>{record.createdBy}</strong>
-                                </span>
+                        <div className="card" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', marginBottom: 20 }}>
+                            <h4 style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, color: '#166534' }}>
+                                <FiMessageSquare /> Müşteriye SMS Gönder
+                            </h4>
+                            <div className="form-group" style={{ marginBottom: 10 }}>
+                                <textarea
+                                    className="form-textarea"
+                                    placeholder="Mesajınızı buraya yazın..."
+                                    value={customMessage}
+                                    onChange={(e) => setCustomMessage(e.target.value)}
+                                    rows={3}
+                                    style={{ background: 'white' }}
+                                />
                             </div>
-                        )}
+                            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 15 }}>
+                                {smsTemplates.map(t => (
+                                    <button
+                                        key={t.label}
+                                        className="btn btn-xs btn-ghost"
+                                        style={{ fontSize: 11, padding: '2px 8px', border: '1px solid #ccc' }}
+                                        onClick={() => setCustomMessage(t.text)}
+                                    >
+                                        {t.label}
+                                    </button>
+                                ))}
+                            </div>
+                            <button
+                                className="btn btn-success btn-sm"
+                                style={{ width: '100%' }}
+                                onClick={handleSendCustomSms}
+                                disabled={sendingSms || !customMessage.trim()}
+                            >
+                                <FiSend /> {sendingSms ? 'Gönderiliyor...' : 'Manuel SMS Gönder'}
+                            </button>
+                        </div>
 
                         <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
                             <div style={{ display: 'flex', gap: 10 }}>
