@@ -103,7 +103,7 @@ const createPdfContent = (doc: jsPDF, record: Record, settings: Settings | null)
         [isZeroDeposit ? 'Kapora Bekleniyor' : 'Alınan Kapora', `${record.depositAmount.toLocaleString('tr-TR')} ₺`],
         ...(isZeroDeposit ? [] : [['Ödeme Yöntemi', record.paymentType.toUpperCase()]]),
         ['Kalan Tutar', `${(record.totalPrice - record.depositAmount).toLocaleString('tr-TR')} ₺`],
-        ['Vade Tarihi', record.dueDate ? new Date(record.dueDate).toLocaleDateString('tr-TR') : '-']
+        ['Teslim Günü', `${record.daySelection || 1}. Gün`]
     ];
 
     autoTable(doc, {
@@ -120,15 +120,29 @@ const createPdfContent = (doc: jsPDF, record: Record, settings: Settings | null)
         margin: { top: 100 },
     });
 
-    // Footer / Terms
-    const finalY = (doc as any).lastAutoTable.finalY + 20;
-    doc.setFontSize(10);
-    doc.setTextColor(120);
-    doc.text('Bu makbuz elektronik ortamda düzenlenmiştir.', 105, finalY, { align: 'center' });
+    // Footer / Delivery Info
+    const finalY = (doc as any).lastAutoTable.finalY + 15;
+    doc.setFontSize(9);
+    doc.setTextColor(50);
 
-    if (settings?.companyName) {
-        doc.text(settings.companyName, 105, finalY + 6, { align: 'center' });
+    let deliveryMsg = '';
+    const day = record.daySelection || 1;
+    if (day === 1) {
+        deliveryMsg = "KURBANINIZI KURBAN BAYRAMININ 1. GÜNÜ OLAN 27.05.2026 TARİHİNDE SAAT 18:00 İLE 23:00 ARASINDA İSTANBUL YOLU MAĞAZAMIZDAN TESLİM ALABİLİRSİNİZ.";
+    } else if (day === 2) {
+        deliveryMsg = "KURBANINIZI KURBAN BAYRAMININ 2. GÜNÜ OLAN 28.05.2026 TARİHİNDE SAAT 08:00 İLE 18:00 ARASINDA İSTANBUL YOLU MAĞAZAMIZDAN TESLİM ALABİLİRSİNİZ.";
+    } else if (day === 3) {
+        deliveryMsg = "KURBANINIZI KURBAN BAYRAMININ 3. GÜNÜ OLAN 29.05.2026 TARİHİNDE SAAT 08:00 İLE 18:00 ARASINDA İSTANBUL YOLU MAĞAZAMIZDAN TESLİM ALABİLİRSİNİZ.";
     }
 
-    doc.save(`Makbuz_${record.ownerName.replace(/\s+/g, '_')}.pdf`);
+    if (deliveryMsg) {
+        const splitMsg = doc.splitTextToSize(deliveryMsg, 180);
+        doc.text(splitMsg, 105, finalY, { align: 'center' });
+    }
+
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text('Bu makbuz elektronik ortamda düzenlenmiştir.', 105, finalY + (deliveryMsg ? 15 : 5), { align: 'center' });
+
+    doc.save(`Makbuz_${record.orderNumber || record.ownerName.replace(/\s+/g, '_')}.pdf`);
 }
