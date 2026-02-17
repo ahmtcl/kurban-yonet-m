@@ -101,8 +101,18 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
                 notes: editRecord.notes,
                 dueDate: editRecord.dueDate,
                 daySelection: editRecord.daySelection,
-                status: editRecord.status, // Included status update
+                status: editRecord.status,
             });
+
+            // Send Confirmation SMS if not in Admin View (i.e., triggered by OTP flow)
+            if (!isAdminView) {
+                const targetPhone = editRecord.phone || editRecord.phoneBackup;
+                if (targetPhone) {
+                    const confirmMessage = `SAYIN MUSTERIMIZ , ${editRecord.shareTypeName} KURBAN SIPARISINIZ GUNCELENMISTIR. SIPARIS NO: ${editRecord.orderNumber || ''} ALLAH KABUL ETSIN.`;
+                    await sendSMS(targetPhone, confirmMessage);
+                }
+            }
+
             onSave();
             onClose();
         } catch (error) {
