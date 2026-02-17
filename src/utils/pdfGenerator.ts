@@ -57,8 +57,9 @@ const createPdfContent = (doc: jsPDF, record: Record, settings: Settings | null)
 
     // Logo or Company Title
     try {
-        // We assume /logo.png exists in the public folder
-        doc.addImage('/logo.png', 'PNG', 85, 10, 40, 20);
+        // Adjusting logo size to be larger and better centered
+        // 105 is middle, width 60 means start at 105 - 30 = 75
+        doc.addImage('/logo.png', 'PNG', 75, 5, 60, 30);
     } catch (e) {
         // Fallback to text title if logo is missing
         doc.setFontSize(22);
