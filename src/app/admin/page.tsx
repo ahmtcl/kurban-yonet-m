@@ -349,6 +349,7 @@ export default function AdminPage() {
                     <RecordEditModal
                         record={selectedRecord}
                         onClose={() => setSelectedRecord(null)}
+                        isAdminView={true}
                         onSave={() => {
                             loadData(); // Refresh data after edit
                         }}

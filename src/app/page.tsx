@@ -297,6 +297,7 @@ export default function Dashboard() {
         <RecordEditModal
           record={selectedRecord}
           onClose={() => setSelectedRecord(null)}
+          isAdminView={false}
           onSave={() => {
             loadData();
           }}

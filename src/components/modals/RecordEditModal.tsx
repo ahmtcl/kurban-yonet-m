@@ -10,9 +10,10 @@ interface RecordEditModalProps {
     record: RecordType | null;
     onClose: () => void;
     onSave: () => void;
+    isAdminView?: boolean; // Added to distinguish context
 }
 
-export default function RecordEditModal({ record, onClose, onSave }: RecordEditModalProps) {
+export default function RecordEditModal({ record, onClose, onSave, isAdminView = false }: RecordEditModalProps) {
     const { isAdmin } = useAdmin();
     const [editRecord, setEditRecord] = useState<RecordType | null>(null);
     const [saving, setSaving] = useState(false);
@@ -43,8 +44,8 @@ export default function RecordEditModal({ record, onClose, onSave }: RecordEditM
         // Validation
         if (!editRecord.ownerName) return alert('Ad Soyad boş olamaz.');
 
-        // If Admin, proceed directly
-        if (isAdmin) {
+        // If Admin AND in Admin View, proceed directly
+        if (isAdmin && isAdminView) {
             await executeUpdate();
             return;
         }

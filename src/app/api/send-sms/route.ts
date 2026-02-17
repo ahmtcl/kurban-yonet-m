@@ -15,25 +15,21 @@ export async function POST(request: Request) {
         const msgheader = process.env.NETGSM_HEADER;
 
         // Sanitize credentials
-        const cleanUsercode = usercode?.replace(/"/g, '') || '';
-        const cleanPassword = password?.replace(/"/g, '') || '';
-        const cleanHeader = msgheader?.replace(/"/g, '') || '';
+        const cleanUsercode = usercode?.trim().replace(/"/g, '') || '';
+        const cleanPassword = password?.trim().replace(/"/g, '') || '';
+        const cleanHeader = msgheader?.trim().replace(/"/g, '') || '';
 
-        if (!cleanUsercode || !cleanPassword || !cleanHeader) {
-            console.error('NetGSM credentials missing or invalid.');
-            return NextResponse.json({ success: false, error: 'Server configuration error' }, { status: 500 });
-        }
+        console.log('Credentials Lengths - User:', cleanUsercode.length, 'Pass:', cleanPassword.length, 'Header:', cleanHeader.length);
 
-        console.log('Header:', cleanHeader, 'Length:', cleanHeader.length);
-
-        // Switch back to GET Method as it passed Auth (Error 30 vs Error 70)
-        const apiUrl = `https://api.netgsm.com.tr/sms/send/get`;
+        // NetGSM GET API URL (Ensuring trailing slash as per some docs)
+        const apiUrl = `https://api.netgsm.com.tr/sms/send/get/`;
         const params = new URLSearchParams({
             usercode: cleanUsercode,
             password: cleanPassword,
             msgheader: cleanHeader,
-            mobiles: phone,
-            message: message
+            gsmno: phone, // Changed from 'mobiles' to 'gsmno'
+            message: message,
+            dil: 'TR' // Added for Turkish character support
         });
 
         // Send request to NetGSM

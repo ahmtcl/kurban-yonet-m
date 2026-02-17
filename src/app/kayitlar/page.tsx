@@ -478,6 +478,7 @@ export default function KayitlarPage() {
                 <RecordEditModal
                     record={editRecord}
                     onClose={() => setEditRecord(null)}
+                    isAdminView={false}
                     onSave={() => {
                         showToast('success', 'Kayıt güncellendi!');
                         loadData();

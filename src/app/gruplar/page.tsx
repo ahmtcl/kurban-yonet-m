@@ -270,6 +270,7 @@ export default function GruplarPage() {
                 <RecordEditModal
                     record={editRecord}
                     onClose={() => setEditRecord(null)}
+                    isAdminView={false}
                     onSave={() => setRefreshTrigger(prev => prev + 1)}
                 />
             )}
