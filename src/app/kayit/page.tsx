@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FiSave, FiUserPlus, FiCheck, FiX, FiPlus, FiUsers, FiInfo } from 'react-icons/fi';
-import { getShareTypes, getGroups, getSettings, addRecord, addGroup, addMemberToGroup, getGroupMembers } from '@/lib/firestore';
+import { getShareTypes, getGroups, getSettings, addRecord, addGroup, addMemberToGroup, getGroupMembers, getRecordById } from '@/lib/firestore';
 import type { ShareType, Group, Settings, PaymentType, Record } from '@/types';
 import { generateReceipt } from '@/utils/pdfGenerator';
+import { sendSMS, generateOTP } from '@/utils/sms';
 
 export default function YeniKayit() {
     const router = useRouter();
@@ -40,6 +41,11 @@ export default function YeniKayit() {
 
     // Receipt state
     const [lastRecord, setLastRecord] = useState<Record | null>(null);
+
+    // OTP State
+    const [otpSent, setOtpSent] = useState(false);
+    const [serverOtp, setServerOtp] = useState('');
+    const [userOtp, setUserOtp] = useState('');
 
     useEffect(() => {
         loadData();
@@ -93,6 +99,42 @@ export default function YeniKayit() {
 
         setSaving(true);
         try {
+            // Send SMS Verification Code
+            const code = generateOTP();
+            setServerOtp(code);
+
+            const targetPhone = phone;
+            if (!targetPhone || targetPhone.length < 10) {
+                showToast('error', 'Geçerli bir telefon numarası giriniz.');
+                setSaving(false);
+                return;
+            }
+
+            const message = `Sayin ${ownerName}, kurban kayit islemi icin dogrulama kodunuz: ${code}`;
+            const smsResult = await sendSMS(targetPhone, message);
+
+            if (smsResult) {
+                setOtpSent(true);
+                showToast('success', `Doğrulama kodu ${targetPhone} numarasına gönderildi.`);
+            } else {
+                showToast('error', 'SMS gönderilemedi. Lütfen bilgileri kontrol edin.');
+            }
+        } catch (err) {
+            console.error('SMS hatası:', err);
+            showToast('error', 'SMS gönderilirken bir hata oluştu!');
+        } finally {
+            setSaving(false);
+        }
+    }
+
+    async function handleVerifyAndSave() {
+        if (userOtp !== serverOtp) {
+            showToast('error', 'Hatalı doğrulama kodu!');
+            return;
+        }
+
+        setSaving(true);
+        try {
             const newRecordData = {
                 ownerName: ownerName.trim(),
                 phone,
@@ -106,21 +148,29 @@ export default function YeniKayit() {
                 groupId: assignedGroupId,
                 daySelection: settings?.activeDay || 1,
                 notes,
-                smsVerified: false,
+                smsVerified: true,
                 status: 'waiting_approval' as const,
                 createdBy: 'admin',
             };
 
             const docRef = await addRecord(newRecordData);
 
+            // 2. Fetch the created record to get the generated orderNumber
+            const createdRecord = await getRecordById(docRef.id);
+            const orderNo = createdRecord?.orderNumber || '';
+
             // Set for receipt
-            setLastRecord({ id: docRef.id, ...newRecordData, createdAt: new Date() } as Record);
+            setLastRecord({ id: docRef.id, ...newRecordData, orderNumber: orderNo, createdAt: new Date() } as Record);
 
             if (assignedGroupId) {
                 await addMemberToGroup(assignedGroupId, docRef.id);
             }
 
-            showToast('success', 'Kayıt başarıyla oluşturuldu!');
+            // 3. Send Confirmation SMS
+            const confirmMessage = `SAYIN MUSTERIMIZ , ${selectedShareType?.name || ''} KURBAN SIPARISINIZ ALINMISTIR. KURBANINIZI BAYRAMIN 1. GUNU OLAN 27.05.2026 ÇARŞAMBA GUNU 18:00-23:00 SAATLERİ ICINDE TESLIM ALABILIRSINIZ. ALLAH KABUL ETSIN SIPARIS NO: ${orderNo}`;
+            await sendSMS(phone, confirmMessage);
+
+            showToast('success', 'Kayıt başarıyla oluşturuldu ve onay SMS\'i gönderildi!');
 
             // Reset form
             setOwnerName('');
@@ -133,6 +183,9 @@ export default function YeniKayit() {
             setNotes('');
             setAssignedGroupId(null);
             setAssignedGroupId(null);
+            setOtpSent(false);
+            setUserOtp('');
+            setServerOtp('');
         } catch (err) {
             console.error('Kayıt hatası:', err);
             showToast('error', 'Kayıt oluşturulurken hata oluştu!');
@@ -401,8 +454,62 @@ export default function YeniKayit() {
                             </button>
                         )}
                     </div>
-
                 </form >
+
+                {otpSent && (
+                    <div className="modal-backdrop">
+                        <div className="modal" style={{ maxWidth: 400, textAlign: 'center' }}>
+                            <div className="modal-header">
+                                <h3>SMS Doğrulama</h3>
+                                <button type="button" className="btn btn-icon btn-ghost" onClick={() => setOtpSent(false)}><FiX /></button>
+                            </div>
+                            <div style={{ padding: '20px 10px' }}>
+                                <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
+                                    <strong>{phone}</strong> numarasına gönderilen 6 haneli kodu giriniz.
+                                </p>
+                                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 25 }}>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        style={{
+                                            maxWidth: 220,
+                                            textAlign: 'center',
+                                            fontSize: 28,
+                                            letterSpacing: 6,
+                                            fontWeight: 'bold',
+                                            height: 60,
+                                            border: '2px solid var(--accent-primary)'
+                                        }}
+                                        placeholder="000000"
+                                        maxLength={6}
+                                        value={userOtp}
+                                        onChange={(e) => setUserOtp(e.target.value.replace(/\D/g, ''))}
+                                        autoFocus
+                                    />
+                                </div>
+                                <div className="modal-footer" style={{ borderTop: 'none', padding: 0, justifyContent: 'center', gap: 12 }}>
+                                    <button
+                                        type="button"
+                                        className="btn btn-ghost"
+                                        onClick={() => setOtpSent(false)}
+                                        style={{ minWidth: 100 }}
+                                    >
+                                        Vazgeç
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-primary"
+                                        onClick={handleVerifyAndSave}
+                                        disabled={saving || userOtp.length !== 6}
+                                        style={{ minWidth: 160 }}
+                                    >
+                                        {saving ? 'Doğrulanıyor...' : 'Kaydı Tamamla'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div >
 
             {/* Group Modal - Advanced */}
