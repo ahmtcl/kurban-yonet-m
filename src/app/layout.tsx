@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/layout/Sidebar";
+import { AdminProvider } from "@/context/AdminContext";
+
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Kurban Hisse Yönetim Sistemi",
@@ -14,17 +18,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="tr">
-      <head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body suppressHydrationWarning={true}>
-        <div className="app-layout">
-          <Sidebar />
-          <main className="main-content">{children}</main>
-        </div>
+      <body className={`${inter.className} antialiased`} suppressHydrationWarning={true}>
+        <AdminProvider>
+          <div className="layout-container">
+            <Sidebar />
+            <main className="main-content">
+              {children}
+            </main>
+          </div>
+        </AdminProvider>
       </body>
     </html>
   );

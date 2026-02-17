@@ -8,7 +8,7 @@ export interface ShareType {
     createdAt: Date;
 }
 
-export type PaymentType = 'nakit' | 'kredi_karti' | 'havale';
+export type PaymentType = 'nakit' | 'kredi_karti' | 'havale' | 'online_kredi_karti' | 'teslimatta';
 
 export interface Record {
     id: string;
@@ -25,7 +25,10 @@ export interface Record {
     daySelection: 1 | 2 | 3;
     notes: string;
     smsVerified: boolean;
+    orderNumber?: number;
+    status: 'waiting_approval' | 'approved'; // Added status
     createdAt: Date;
+    updatedAt?: Date; // Added updatedAt
     createdBy: string;
 }
 
@@ -48,6 +51,7 @@ export interface Settings {
     daySelectionDefault: 1 | 2 | 3;
     activeDay: 1 | 2 | 3; // Locked day for new records
     moveButtonEnabled: boolean;
+    lastOrderNumber?: number; // Added for auto-increment
 }
 
 export interface DashboardStats {

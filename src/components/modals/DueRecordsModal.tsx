@@ -27,6 +27,7 @@ export default function DueRecordsModal({ records, onClose, onSelectRecord }: Du
                     <table>
                         <thead>
                             <tr>
+                                <th>Sipariş No</th>
                                 <th>Ad Soyad</th>
                                 <th>Telefon</th>
                                 <th>Kalan Tutar</th>
@@ -41,6 +42,7 @@ export default function DueRecordsModal({ records, onClose, onSelectRecord }: Du
 
                                 return (
                                     <tr key={r.id} style={{ backgroundColor: isPastDue ? '#fff5f5' : 'inherit' }}>
+                                        <td style={{ fontWeight: 600, color: '#666' }}>#{r.orderNumber || '-'}</td>
                                         <td style={{ fontWeight: 500 }}>{r.ownerName}</td>
                                         <td>{r.phone}</td>
                                         <td style={{ fontWeight: 600, color: 'var(--accent-danger)' }}>

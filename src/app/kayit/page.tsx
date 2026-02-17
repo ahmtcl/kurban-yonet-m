@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { FiSave, FiUserPlus, FiCheck, FiX, FiPlus, FiUsers } from 'react-icons/fi';
+import { FiSave, FiUserPlus, FiCheck, FiX, FiPlus, FiUsers, FiInfo } from 'react-icons/fi';
 import { getShareTypes, getGroups, getSettings, addRecord, addGroup, addMemberToGroup, getGroupMembers } from '@/lib/firestore';
 import type { ShareType, Group, Settings, PaymentType, Record } from '@/types';
 import { generateReceipt } from '@/utils/pdfGenerator';
@@ -107,6 +107,7 @@ export default function YeniKayit() {
                 daySelection: settings?.activeDay || 1,
                 notes,
                 smsVerified: false,
+                status: 'waiting_approval' as const,
                 createdBy: 'admin',
             };
 
@@ -324,7 +325,9 @@ export default function YeniKayit() {
                             >
                                 <option value="nakit">Nakit</option>
                                 <option value="kredi_karti">Kredi Kartı</option>
+                                <option value="online_kredi_karti">Online Kredi Kartı</option>
                                 <option value="havale">Havale / EFT</option>
+                                <option value="teslimatta">Tamamı Teslimatta</option>
                             </select>
                         </div>
                         <div className="form-group">
@@ -364,9 +367,16 @@ export default function YeniKayit() {
                                 </button>
                             </div>
                         ) : (
-                            <button type="button" className="btn btn-ghost" onClick={() => setShowGroupModal(true)} style={{ width: '100%', justifyContent: 'flex-start', borderStyle: 'dashed' }}>
-                                <FiUsers /> Gruba Ekle / Oluştur
-                            </button>
+                            shareTypes.find(s => s.id === shareTypeId)?.name?.toLowerCase().includes('küçükbaş') ? (
+                                <div style={{ padding: 10, border: '1px dashed #ddd', borderRadius: 4, background: '#f9f9f9', color: '#888', fontStyle: 'italic', fontSize: 13 }}>
+                                    <FiInfo style={{ marginRight: 6 }} />
+                                    Küçükbaş hisseler için grup oluşturulamaz.
+                                </div>
+                            ) : (
+                                <button type="button" className="btn btn-ghost" onClick={() => setShowGroupModal(true)} style={{ width: '100%', justifyContent: 'flex-start', borderStyle: 'dashed' }}>
+                                    <FiUsers /> Gruba Ekle / Oluştur
+                                </button>
+                            )
                         )}
                     </div>
 
@@ -425,7 +435,7 @@ export default function YeniKayit() {
                             {groupMode === 'select' ? (
                                 <>
                                     <div className="form-group">
-                                        <label className="form-label">Bir Grup Seçin</label>
+                                        <label className="form-label">Bir Grup Seçin ({shareTypes.find(s => s.id === shareTypeId)?.name})</label>
                                         <div style={{
                                             maxHeight: 250,
                                             overflowY: 'auto',
@@ -433,29 +443,31 @@ export default function YeniKayit() {
                                             borderRadius: 4,
                                             background: '#fff'
                                         }}>
-                                            {groups.length > 0 ? groups.map(g => (
-                                                <div
-                                                    key={g.id}
-                                                    onClick={() => setSelectedGroupId(g.id)}
-                                                    style={{
-                                                        padding: '10px 12px',
-                                                        borderBottom: '1px solid #eee',
-                                                        cursor: 'pointer',
-                                                        backgroundColor: selectedGroupId === g.id ? '#e3f2fd' : 'transparent',
-                                                        color: selectedGroupId === g.id ? '#0d47a1' : 'inherit',
-                                                        fontWeight: selectedGroupId === g.id ? 600 : 400,
-                                                        display: 'flex',
-                                                        justifyContent: 'space-between',
-                                                        alignItems: 'center'
-                                                    }}
-                                                >
-                                                    <span>{g.name}</span>
-                                                    <span style={{ fontSize: 12, color: selectedGroupId === g.id ? '#0d47a1' : '#666' }}>
-                                                        {g.shareTypeName} • {g.memberIds.length} Üye
-                                                    </span>
-                                                </div>
-                                            )) : (
-                                                <div style={{ padding: 20, textAlign: 'center', color: '#999' }}>Hiç grup bulunamadı.</div>
+                                            {groups.filter(g => g.shareTypeId === shareTypeId).length > 0 ? groups
+                                                .filter(g => g.shareTypeId === shareTypeId)
+                                                .map(g => (
+                                                    <div
+                                                        key={g.id}
+                                                        onClick={() => setSelectedGroupId(g.id)}
+                                                        style={{
+                                                            padding: '10px 12px',
+                                                            borderBottom: '1px solid #eee',
+                                                            cursor: 'pointer',
+                                                            backgroundColor: selectedGroupId === g.id ? '#e3f2fd' : 'transparent',
+                                                            color: selectedGroupId === g.id ? '#0d47a1' : 'inherit',
+                                                            fontWeight: selectedGroupId === g.id ? 600 : 400,
+                                                            display: 'flex',
+                                                            justifyContent: 'space-between',
+                                                            alignItems: 'center'
+                                                        }}
+                                                    >
+                                                        <span>{g.name}</span>
+                                                        <span style={{ fontSize: 12, color: selectedGroupId === g.id ? '#0d47a1' : '#666' }}>
+                                                            {g.shareTypeName} • {g.memberIds.length} Üye
+                                                        </span>
+                                                    </div>
+                                                )) : (
+                                                <div style={{ padding: 20, textAlign: 'center', color: '#999' }}>Bu hisse tipi için uygun grup bulunamadı.</div>
                                             )}
                                         </div>
                                     </div>

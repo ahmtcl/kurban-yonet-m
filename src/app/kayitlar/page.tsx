@@ -18,6 +18,9 @@ export default function KayitlarPage() {
     const [filterPayment, setFilterPayment] = useState('');
     const [filterGroup, setFilterGroup] = useState('');
     const [filterDay, setFilterDay] = useState('');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [dateFilterType, setDateFilterType] = useState<'createdAt' | 'updatedAt'>('createdAt');
 
     const [toast, setToast] = useState<{ type: string; message: string } | null>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -55,14 +58,42 @@ export default function KayitlarPage() {
             const matchGroup = !filterGroup || r.groupId === filterGroup;
             const matchDay = !filterDay || r.daySelection?.toString() === filterDay;
 
-            return matchSearch && matchShare && matchPayment && matchGroup && matchDay;
+            let matchDate = true;
+            if (startDate || endDate) {
+                const targetDate = dateFilterType === 'updatedAt'
+                    ? (r.updatedAt ? new Date(r.updatedAt) : null)
+                    : new Date(r.createdAt);
+
+                if (targetDate) {
+                    targetDate.setHours(0, 0, 0, 0); // Compare dates only
+
+                    if (startDate) {
+                        const start = new Date(startDate);
+                        start.setHours(0, 0, 0, 0);
+                        if (targetDate < start) matchDate = false;
+                    }
+                    if (endDate) {
+                        const end = new Date(endDate);
+                        end.setHours(0, 0, 0, 0);
+                        if (targetDate > end) matchDate = false;
+                    }
+                } else if (dateFilterType === 'updatedAt') {
+                    // If filtering by updated at but record matches search criteria otherwise, 
+                    // and we have a filter active, maybe exclude? 
+                    // If user selects a date range for updates, show only those with updates in that range.
+                    // If record has no updatedAt, it shouldn't match.
+                    matchDate = false;
+                }
+            }
+
+            return matchSearch && matchShare && matchPayment && matchGroup && matchDay && matchDate;
         });
 
         // Default sort by createdAt desc (newest first)
         return result.sort((a, b) => {
             return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
-    }, [records, search, filterShareType, filterPayment, filterGroup, filterDay]);
+    }, [records, search, filterShareType, filterPayment, filterGroup, filterDay, startDate, endDate, dateFilterType]);
 
     // Summary
     const totalCount = filteredAndSorted.length;
@@ -101,7 +132,8 @@ export default function KayitlarPage() {
             doc.setFontSize(11);
             doc.text(`Tarih: ${new Date().toLocaleDateString('tr-TR')}`, 14, 30);
 
-            const tableColumn = ["Sıra", "Ad Soyad", "Telefon", "Hisse", "Grup", "Gün", "Toplam", "Kalan", "Not"];
+            // PDF Export
+            const tableColumn = ["Sıra", "Sipariş No", "Sipariş Tarihi", "Ad Soyad", "Telefon", "Hisse", "Grup", "Gün", "Toplam", "Kalan", "Not"];
             const tableRows: any[] = [];
 
             filteredAndSorted.forEach((r, index) => {
@@ -109,6 +141,8 @@ export default function KayitlarPage() {
                 const kalan = (r.totalPrice || 0) - r.depositAmount;
                 const rowData = [
                     index + 1,
+                    r.orderNumber || '-',
+                    new Date(r.createdAt).toLocaleDateString('tr-TR'),
                     r.ownerName,
                     r.phone,
                     r.shareTypeName || '-',
@@ -143,13 +177,15 @@ export default function KayitlarPage() {
         import('xlsx').then((XLSX) => {
             // Prepare Data
             const title = [`KURBAN HİSSEDARLARI LİSTESİ - ${new Date().toLocaleDateString('tr-TR')}`];
-            const headers = ['Sıra', 'Ad Soyad', 'Telefon', 'Yedek Tel', 'Hisse', 'Grup', 'Gün', 'Toplam', 'Ödenen', 'Kalan', 'Ödeme Türü', 'Vade', 'Kayıt Tarihi', 'Açıklama'];
+            const headers = ['Sıra', 'Sipariş No', 'Sipariş Tarihi', 'Ad Soyad', 'Telefon', 'Yedek Tel', 'Hisse', 'Grup', 'Gün', 'Toplam', 'Ödenen', 'Kalan', 'Ödeme Türü', 'Vade', 'Açıklama'];
 
             const dataRows = filteredAndSorted.map((r, i) => {
                 const group = groups.find(g => g.id === r.groupId);
                 const kalan = (r.totalPrice || 0) - r.depositAmount;
                 return [
                     i + 1,
+                    r.orderNumber || '',
+                    new Date(r.createdAt).toLocaleDateString('tr-TR'),
                     r.ownerName,
                     r.phone,
                     r.phoneBackup || '',
@@ -159,9 +195,8 @@ export default function KayitlarPage() {
                     r.totalPrice || 0,
                     r.depositAmount || 0,
                     kalan,
-                    r.paymentType === 'nakit' ? 'Nakit' : r.paymentType === 'kredi_karti' ? 'Kredi Kartı' : 'Havale',
+                    r.paymentType === 'nakit' ? 'Nakit' : r.paymentType === 'kredi_karti' ? 'Kredi Kartı' : r.paymentType === 'online_kredi_karti' ? 'Online Kredi Kartı' : r.paymentType === 'teslimatta' ? 'Tamamı Teslimatta' : 'Havale',
                     r.dueDate ? new Date(r.dueDate).toLocaleDateString('tr-TR') : '',
-                    new Date(r.createdAt).toLocaleDateString('tr-TR'),
                     r.notes || ''
                 ];
             });
@@ -171,7 +206,7 @@ export default function KayitlarPage() {
             const totalOdenen = filteredAndSorted.reduce((acc, r) => acc + (r.depositAmount || 0), 0);
             const totalKalan = totalTutar - totalOdenen;
 
-            const footerRow = ['', '', '', '', '', '', 'GENEL TOPLAM:', totalTutar, totalOdenen, totalKalan, '', '', '', ''];
+            const footerRow = ['', '', '', '', '', '', '', 'GENEL TOPLAM:', totalTutar, totalOdenen, totalKalan, '', '', '', ''];
 
             // Combine all data
             const wsData = [
@@ -188,6 +223,7 @@ export default function KayitlarPage() {
             // Column Widths
             const colWidths = [
                 { wch: 5 },  // Sıra
+                { wch: 10 }, // Sipariş No
                 { wch: 25 }, // Ad Soyad
                 { wch: 15 }, // Telefon
                 { wch: 15 }, // Yedek Tel
@@ -205,7 +241,7 @@ export default function KayitlarPage() {
             ws['!cols'] = colWidths;
 
             // Merge Title
-            ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 13 } }];
+            ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 14 } }];
 
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Kayıtlar');
@@ -286,8 +322,39 @@ export default function KayitlarPage() {
                         <option value="">Tüm Ödemeler</option>
                         <option value="nakit">Nakit</option>
                         <option value="kredi_karti">Kredi Kartı</option>
+                        <option value="online_kredi_karti">Online Kredi Kartı</option>
                         <option value="havale">Havale</option>
+                        <option value="teslimatta">Tamamı Teslimatta</option>
                     </select>
+
+                    <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                        <select
+                            className="form-select"
+                            style={{ width: 'auto', fontSize: 13, padding: '6px 10px' }}
+                            value={dateFilterType}
+                            onChange={(e) => setDateFilterType(e.target.value as 'createdAt' | 'updatedAt')}
+                        >
+                            <option value="createdAt">Sipariş Tarihi</option>
+                            <option value="updatedAt">Güncelleme Tarihi</option>
+                        </select>
+                        <input
+                            type="date"
+                            className="form-input"
+                            style={{ width: 'auto', minWidth: 130 }}
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            title="Başlangıç Tarihi"
+                        />
+                        <span style={{ color: '#999' }}>-</span>
+                        <input
+                            type="date"
+                            className="form-input"
+                            style={{ width: 'auto', minWidth: 130 }}
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            title="Bitiş Tarihi"
+                        />
+                    </div>
                 </div>
 
                 {/* Table */}
@@ -296,12 +363,16 @@ export default function KayitlarPage() {
                         <thead>
                             <tr>
                                 <th>#</th>
+                                <th>Durum</th>
+                                <th>Sipariş No</th>
+                                <th>{dateFilterType === 'updatedAt' ? 'Güncelleme T.' : 'Sipariş Tarihi'}</th>
                                 <th>Ad Soyad</th>
                                 <th>Telefon / Yedek</th>
                                 <th>Hisse / Grup</th>
                                 <th>Gün</th>
                                 <th>Toplam</th>
                                 <th>Ödenen / Kalan</th>
+                                <th>Ödeme Türü</th>
                                 <th>Vade</th>
                                 <th>Açıklama</th>
                                 <th>İşlem</th>
@@ -316,9 +387,21 @@ export default function KayitlarPage() {
                                 return (
                                     <tr key={r.id}>
                                         <td style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
+                                        <td>
+                                            {r.status === 'approved' ? (
+                                                <span className="badge badge-success" style={{ fontSize: 11 }}>Onaylandı</span>
+                                            ) : (
+                                                <span className="badge badge-warning" style={{ fontSize: 11 }}>Bekliyor</span>
+                                            )}
+                                        </td>
+                                        <td style={{ fontWeight: 600, color: '#666' }}>#{r.orderNumber || '-'}</td>
+                                        <td style={{ fontSize: 12, color: '#555' }}>
+                                            {dateFilterType === 'updatedAt'
+                                                ? (r.updatedAt ? new Date(r.updatedAt).toLocaleDateString('tr-TR') : '-')
+                                                : new Date(r.createdAt).toLocaleDateString('tr-TR')}
+                                        </td>
                                         <td style={{ fontWeight: 500 }}>
                                             {r.ownerName}
-                                            <div style={{ fontSize: 11, color: '#999' }}>{new Date(r.createdAt).toLocaleDateString('tr-TR')}</div>
                                         </td>
                                         <td>
                                             <div style={{ fontSize: 13 }}>{r.phone}</div>
@@ -344,6 +427,12 @@ export default function KayitlarPage() {
                                         <td>
                                             <div style={{ color: 'var(--accent-success)', fontSize: 13 }}>{r.depositAmount.toLocaleString('tr-TR')} ₺</div>
                                             {kalan > 0 && <div style={{ color: 'var(--accent-warning)', fontSize: 12, fontWeight: 500 }}>Kalan: {kalan.toLocaleString('tr-TR')} ₺</div>}
+                                        </td>
+                                        <td style={{ fontSize: 13, fontWeight: 500 }}>
+                                            {r.paymentType === 'nakit' ? 'Nakit' :
+                                                r.paymentType === 'kredi_karti' ? 'Kredi Kartı' :
+                                                    r.paymentType === 'online_kredi_karti' ? 'Online K.K.' :
+                                                        r.paymentType === 'teslimatta' ? 'Teslimatta' : 'Havale'}
                                         </td>
                                         <td style={{ color: isOverdue ? 'var(--accent-danger)' : 'var(--text-secondary)', fontSize: 13 }}>
                                             {r.dueDate ? new Date(r.dueDate).toLocaleDateString('tr-TR') : '—'}
@@ -374,7 +463,7 @@ export default function KayitlarPage() {
                                 );
                             }) : (
                                 <tr>
-                                    <td colSpan={10} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+                                    <td colSpan={14} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
                                         Kayıt bulunamadı
                                     </td>
                                 </tr>

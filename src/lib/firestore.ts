@@ -12,6 +12,7 @@ import {
     serverTimestamp,
     Timestamp,
     setDoc,
+    runTransaction, // Added runTransaction
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { ShareType, Record, Group, Settings, PaymentType } from '@/types';
@@ -20,7 +21,7 @@ import type { ShareType, Record, Group, Settings, PaymentType } from '@/types';
 export async function getShareTypes(): Promise<ShareType[]> {
     const q = query(collection(db, 'shareTypes'), orderBy('minKg', 'asc'));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map((d) => ({
+    const allTypes = snapshot.docs.map((d) => ({
         id: d.id,
         name: d.data().name,
         minKg: d.data().minKg,
@@ -29,6 +30,12 @@ export async function getShareTypes(): Promise<ShareType[]> {
         isActive: d.data().isActive ?? true,
         createdAt: d.data().createdAt?.toDate?.() || new Date(),
     }));
+
+    // Separate into normal and special (containing %)
+    const normalTypes = allTypes.filter(t => !t.name.includes('%'));
+    const specialTypes = allTypes.filter(t => t.name.includes('%'));
+
+    return [...normalTypes, ...specialTypes];
 }
 
 export async function addShareType(data: Omit<ShareType, 'id' | 'createdAt'>) {
@@ -66,30 +73,75 @@ export async function getRecords(): Promise<Record[]> {
         daySelection: d.data().daySelection || 1,
         notes: d.data().notes || '',
         smsVerified: d.data().smsVerified || false,
+        orderNumber: d.data().orderNumber,
+        status: d.data().status || 'waiting_approval', // Added status
         createdAt: d.data().createdAt?.toDate?.() || new Date(),
+        updatedAt: d.data().updatedAt?.toDate?.() || null, // Added updatedAt
         createdBy: d.data().createdBy || '',
     }));
 }
 
 export async function addRecord(data: Omit<Record, 'id' | 'createdAt'>) {
-    const { id, ...rest } = data as Record & { id?: string };
-    return addDoc(collection(db, 'records'), {
-        ...rest,
-        dueDate: rest.dueDate ? Timestamp.fromDate(new Date(rest.dueDate)) : null,
-        createdAt: serverTimestamp(),
+    // Check if phone or backup phone exists to prevent duplicates? 
+    // For now, focusing on Order Number transaction.
+
+    return runTransaction(db, async (transaction) => {
+        // 1. Get Settings for order number
+        const settingsRef = doc(db, 'settings', 'general');
+        const settingsSnap = await transaction.get(settingsRef);
+
+        let newOrderNumber = 59794; // Default start
+
+        if (settingsSnap.exists()) {
+            const currentLast = settingsSnap.data().lastOrderNumber;
+            if (typeof currentLast === 'number') {
+                newOrderNumber = currentLast + 1;
+            }
+        } else {
+            // Create settings if not exists (shouldn't happen often but safe)
+            transaction.set(settingsRef, {
+                targetCount: 100,
+                companyName: '',
+                companyTitle: '',
+                activeDay: 1
+            }, { merge: true });
+        }
+
+        // 2. Create New Record Reference
+        const newRecordRef = doc(collection(db, 'records'));
+        const { id, ...rest } = data as Record & { id?: string };
+
+        // 3. Set Record Data
+        transaction.set(newRecordRef, {
+            ...rest,
+            orderNumber: newOrderNumber,
+            status: rest.status || 'waiting_approval', // Ensure default status
+            dueDate: rest.dueDate ? Timestamp.fromDate(new Date(rest.dueDate)) : null,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(), // Set initial update date same as created
+        });
+
+        // 4. Update Settings with new lastOrderNumber
+        transaction.set(settingsRef, { lastOrderNumber: newOrderNumber }, { merge: true });
+
+        return newRecordRef;
     });
 }
 
 export async function updateRecord(id: string, data: Partial<Record>) {
     const cleanData: { [key: string]: unknown } = {};
     for (const [key, value] of Object.entries(data)) {
-        if (key === 'id' || key === 'createdAt') continue;
+        if (key === 'id' || key === 'createdAt' || key === 'updatedAt') continue; // Skip manual date setting
         if (key === 'dueDate' && value) {
             cleanData[key] = Timestamp.fromDate(new Date(value as string));
         } else {
             cleanData[key] = value;
         }
     }
+
+    // Always update updatedAt
+    cleanData['updatedAt'] = serverTimestamp();
+
     return updateDoc(doc(db, 'records', id), cleanData);
 }
 
@@ -116,7 +168,10 @@ export async function getRecordById(id: string): Promise<Record | null> {
         daySelection: d.daySelection || 1,
         notes: d.notes || '',
         smsVerified: d.smsVerified || false,
+        orderNumber: d.orderNumber,
+        status: d.status || 'waiting_approval', // Added status
         createdAt: d.createdAt?.toDate?.() || new Date(),
+        updatedAt: d.updatedAt?.toDate?.() || null,
         createdBy: d.createdBy || '',
     };
 }
@@ -188,7 +243,10 @@ export async function getGroupMembers(groupId: string): Promise<Record[]> {
         daySelection: d.data().daySelection || 1,
         notes: d.data().notes || '',
         smsVerified: d.data().smsVerified || false,
+        orderNumber: d.data().orderNumber,
+        status: d.data().status || 'waiting_approval', // Added status
         createdAt: d.data().createdAt?.toDate?.() || new Date(),
+        updatedAt: d.data().updatedAt?.toDate?.() || null,
         createdBy: d.data().createdBy || '',
     }));
 }
@@ -206,6 +264,7 @@ export async function getSettings(): Promise<Settings> {
             daySelectionDefault: 1,
             activeDay: 1,
             moveButtonEnabled: true,
+            lastOrderNumber: 59793, // Initialize with 59793 so next is 59794
         };
         await setDoc(doc(db, 'settings', 'general'), defaults);
         return defaults;

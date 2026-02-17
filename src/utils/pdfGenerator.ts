@@ -71,6 +71,13 @@ const createPdfContent = (doc: jsPDF, record: Record, settings: Settings | null)
     const dateStr = new Date().toLocaleDateString('tr-TR');
     doc.text(`Tarih: ${dateStr}`, 190, 40, { align: 'right' });
 
+    // Order Number (New)
+    if (record.orderNumber) {
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text(`Sipariş No: #${record.orderNumber}`, 190, 46, { align: 'right' });
+    }
+
     // Customer Info
     doc.setFontSize(12);
     doc.setTextColor(0);
