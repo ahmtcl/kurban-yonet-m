@@ -55,16 +55,22 @@ const createPdfContent = (doc: jsPDF, record: Record, settings: Settings | null)
         doc.setFont('Roboto');
     }
 
-    // Company Title (Header)
-    doc.setFontSize(22);
-    doc.setTextColor(40);
-    const title = settings?.companyTitle || 'KURBAN HİSSE YÖNETİM';
-    doc.text(title, 105, 20, { align: 'center' });
+    // Logo or Company Title
+    try {
+        // We assume /logo.png exists in the public folder
+        doc.addImage('/logo.png', 'PNG', 85, 10, 40, 20);
+    } catch (e) {
+        // Fallback to text title if logo is missing
+        doc.setFontSize(22);
+        doc.setTextColor(40);
+        const title = settings?.companyTitle || 'KURBAN HİSSE YÖNETİM';
+        doc.text(title, 105, 20, { align: 'center' });
+    }
 
     doc.setFontSize(12);
     doc.setTextColor(100);
     const isZeroDeposit = (record.depositAmount || 0) === 0;
-    doc.text(isZeroDeposit ? 'Kurban Hissesi Sipariş Makbuzu' : 'Kurban Hissesi Ödeme Makbuzu', 105, 30, { align: 'center' });
+    doc.text(isZeroDeposit ? 'Kurban Hissesi Sipariş Makbuzu' : 'Kurban Hissesi Ödeme Makbuzu', 105, 34, { align: 'center' });
 
     // Date
     doc.setFontSize(10);
