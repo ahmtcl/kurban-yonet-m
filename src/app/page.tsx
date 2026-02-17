@@ -53,7 +53,11 @@ export default function Dashboard() {
 
   // Due Records Logic
   const overdueRecords = records.filter(
-    (r) => r.dueDate && new Date(r.dueDate) < now && r.depositAmount < (r.totalPrice || 0)
+    (r) =>
+      r.dueDate &&
+      new Date(r.dueDate) < now &&
+      r.depositAmount < (r.totalPrice || 0) &&
+      r.depositAmount < 1000 // Only count as "debtor" if paid less than 1000 TL
   );
 
   // Share type breakdown

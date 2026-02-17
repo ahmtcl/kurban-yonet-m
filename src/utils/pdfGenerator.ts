@@ -63,7 +63,8 @@ const createPdfContent = (doc: jsPDF, record: Record, settings: Settings | null)
 
     doc.setFontSize(12);
     doc.setTextColor(100);
-    doc.text('Kurban Hissesi Ödeme Makbuzu', 105, 30, { align: 'center' });
+    const isZeroDeposit = (record.depositAmount || 0) === 0;
+    doc.text(isZeroDeposit ? 'Kurban Hissesi Sipariş Makbuzu' : 'Kurban Hissesi Ödeme Makbuzu', 105, 30, { align: 'center' });
 
     // Date
     doc.setFontSize(10);
@@ -99,8 +100,8 @@ const createPdfContent = (doc: jsPDF, record: Record, settings: Settings | null)
     const tableData = [
         ['Açıklama', 'Tutar'],
         ['Toplam Hisse Bedeli', `${record.totalPrice.toLocaleString('tr-TR')} ₺`],
-        ['Alınan Kapora', `${record.depositAmount.toLocaleString('tr-TR')} ₺`],
-        ['Ödeme Yöntemi', record.paymentType.toUpperCase()],
+        [isZeroDeposit ? 'Kapora Bekleniyor' : 'Alınan Kapora', `${record.depositAmount.toLocaleString('tr-TR')} ₺`],
+        ...(isZeroDeposit ? [] : [['Ödeme Yöntemi', record.paymentType.toUpperCase()]]),
         ['Kalan Tutar', `${(record.totalPrice - record.depositAmount).toLocaleString('tr-TR')} ₺`],
         ['Vade Tarihi', record.dueDate ? new Date(record.dueDate).toLocaleDateString('tr-TR') : '-']
     ];

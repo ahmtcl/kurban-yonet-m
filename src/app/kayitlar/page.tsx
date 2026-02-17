@@ -89,8 +89,13 @@ export default function KayitlarPage() {
             return matchSearch && matchShare && matchPayment && matchGroup && matchDay && matchDate;
         });
 
-        // Default sort by createdAt desc (newest first)
+        // Default sort: waiting_approval first, then by createdAt desc
         return result.sort((a, b) => {
+            // Prioritize waiting_approval
+            if (a.status === 'waiting_approval' && b.status !== 'waiting_approval') return -1;
+            if (a.status !== 'waiting_approval' && b.status === 'waiting_approval') return 1;
+
+            // Secondary: newest first
             return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
     }, [records, search, filterShareType, filterPayment, filterGroup, filterDay, startDate, endDate, dateFilterType]);
