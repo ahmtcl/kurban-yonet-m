@@ -34,11 +34,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const login = async (username: string, password: string) => {
         try {
-            const dbUser = await getUserByUsername(username);
+            const cleanUsername = username.trim();
+            const cleanPassword = password.trim();
+            const dbUser = await getUserByUsername(cleanUsername);
 
             // Note: In a production app, use proper hashing. 
             // For now, simple check as requested "id ve psw gereksin".
-            if (dbUser && dbUser.password === password) {
+            if (dbUser && dbUser.password === cleanPassword) {
                 const { password: _, ...safeUser } = dbUser;
                 setUser(safeUser as User);
                 localStorage.setItem('kurban_user', JSON.stringify(safeUser));
