@@ -16,92 +16,114 @@ import type { Record, Settings } from '@/types';
 // I will try to map them to nearest visual if base64 is too heavy, BUT
 // I will try to load a font from a URL array buffer if possible.
 
-// Let's try adding a font from a remote URL at runtime.
-
-const fontUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf';
+const robotoRegularUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf';
+const robotoBoldUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Medium.ttf'; // Medium works well for Bold
 
 export const generateReceipt = async (record: Record, settings: Settings | null) => {
     const doc = new jsPDF();
 
-    // Add font for Turkish support
-    try {
-        const response = await fetch(fontUrl);
-        const blob = await response.blob();
-        const reader = new FileReader();
+    const loadFont = async (url: string, name: string, style: string) => {
+        try {
+            const response = await fetch(url);
+            const arrayBuffer = await response.arrayBuffer();
+            const base64data = btoa(
+                new Uint8Array(arrayBuffer)
+                    .reduce((data, byte) => data + String.fromCharCode(byte), '')
+            );
+            doc.addFileToVFS(`${name}-${style}.ttf`, base64data);
+            doc.addFont(`${name}-${style}.ttf`, name, style);
+            return true;
+        } catch (e) {
+            console.error(`Font load failed: ${name} ${style}`, e);
+            return false;
+        }
+    };
 
-        reader.readAsDataURL(blob);
-        reader.onloadend = () => {
-            const base64data = (reader.result as string).split(',')[1];
-            doc.addFileToVFS('Roboto-Regular.ttf', base64data);
-            doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
-            doc.setFont('Roboto');
-            createPdfContent(doc, record, settings);
-        };
-        reader.onerror = () => {
-            console.error('Font loading failed, falling back');
-            createPdfContent(doc, record, settings); // Fallback
-        };
-    } catch (e) {
-        console.error('Font fetch failed', e);
-        // Fallback to standard
-        createPdfContent(doc, record, settings);
+    // Load fonts
+    await Promise.all([
+        loadFont(robotoRegularUrl, 'Roboto', 'normal'),
+        loadFont(robotoBoldUrl, 'Roboto', 'bold')
+    ]);
+
+    // Apply font
+    if (doc.getFontList().hasOwnProperty('Roboto')) {
+        doc.setFont('Roboto', 'normal');
     }
+
+    await createPdfContent(doc, record, settings);
 };
 
-const createPdfContent = (doc: jsPDF, record: Record, settings: Settings | null) => {
-    // If Roboto is added, this will use it. Otherwise uses default.
-    // We can also check if font exists.
-    if (doc.getFontList().hasOwnProperty('Roboto')) {
-        doc.setFont('Roboto');
-    }
+const createPdfContent = async (doc: jsPDF, record: Record, settings: Settings | null) => {
+    const fontToUse = doc.getFontList().hasOwnProperty('Roboto') ? 'Roboto' : 'helvetica';
+    doc.setFont(fontToUse, 'normal');
 
     // Logo or Company Title
     try {
-        // Adjusting logo size to be larger and better centered
-        // 105 is middle, width 60 means start at 105 - 30 = 75
-        doc.addImage('/logo.png', 'PNG', 75, 5, 60, 30);
+        // We try to fetch the image first to ensure it exists and load it as base64
+        const logoResponse = await fetch('/logo.png');
+        if (logoResponse.ok) {
+            const blob = await logoResponse.blob();
+            const base64 = await new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.readAsDataURL(blob);
+            });
+            // Centered: 105 - (60 / 2) = 75. Unified size 60x30 to keep it naif but visible
+            doc.addImage(base64, 'PNG', 75, 10, 60, 30);
+        } else {
+            throw new Error('Logo not found');
+        }
     } catch (e) {
         // Fallback to text title if logo is missing
+        doc.setFont(fontToUse, 'bold');
         doc.setFontSize(22);
-        doc.setTextColor(40);
+        doc.setTextColor(0);
         const title = settings?.companyTitle || 'KURBAN HİSSE YÖNETİM';
-        doc.text(title, 105, 20, { align: 'center' });
+        doc.text(title, 105, 25, { align: 'center' });
+        doc.setFont(fontToUse, 'normal');
     }
 
-    doc.setFontSize(12);
-    doc.setTextColor(100);
+    doc.setFontSize(14);
+    doc.setTextColor(0); // Black
     const isZeroDeposit = (record.depositAmount || 0) === 0;
-    doc.text(isZeroDeposit ? 'Kurban Hissesi Sipariş Makbuzu' : 'Kurban Hissesi Ödeme Makbuzu', 105, 34, { align: 'center' });
+    // Positioned below logo
+    doc.text(isZeroDeposit ? 'Kurban Hissesi Sipariş Makbuzu' : 'Kurban Hissesi Ödeme Makbuzu', 105, 55, { align: 'center' });
 
     // Date
     doc.setFontSize(10);
-    doc.setTextColor(100);
+    doc.setTextColor(0); // Black
     const dateStr = new Date().toLocaleDateString('tr-TR');
-    doc.text(`Tarih: ${dateStr}`, 190, 40, { align: 'right' });
+    doc.text(`Tarih: ${dateStr}`, 190, 68, { align: 'right' });
 
     // Order Number (New)
     if (record.orderNumber) {
         doc.setFontSize(10);
-        doc.setTextColor(100);
-        doc.text(`Sipariş No: #${record.orderNumber}`, 190, 46, { align: 'right' });
+        doc.setTextColor(0); // Black
+        doc.text(`Sipariş No: #${record.orderNumber}`, 190, 74, { align: 'right' });
     }
 
     // Customer Info
+    doc.setFont(fontToUse, 'bold');
     doc.setFontSize(12);
     doc.setTextColor(0);
-    doc.text('Müşteri Bilgileri:', 14, 50);
+    doc.text('Müşteri Bilgileri:', 14, 85);
+
+    doc.setFont(fontToUse, 'normal');
     doc.setFontSize(11);
-    doc.setTextColor(80);
-    doc.text(`Ad Soyad: ${record.ownerName}`, 14, 58);
-    doc.text(`Telefon: ${record.phone}`, 14, 64);
+    doc.setTextColor(0); // Black
+    doc.text(`Ad Soyad: ${record.ownerName}`, 14, 93);
+    doc.text(`Telefon: ${record.phone}`, 14, 99);
 
     // Share Info
+    doc.setFont(fontToUse, 'bold');
     doc.setFontSize(12);
     doc.setTextColor(0);
-    doc.text('Hisse Bilgileri:', 14, 80);
+    doc.text('Hisse Bilgileri:', 14, 110);
+
+    doc.setFont(fontToUse, 'normal');
     doc.setFontSize(11);
-    doc.setTextColor(80);
-    doc.text(`Hisse Tipi: ${record.shareTypeName}`, 14, 88);
+    doc.setTextColor(0); // Black
+    doc.text(`Hisse Tipi: ${record.shareTypeName}`, 14, 118);
 
     // Financial Table
     const tableData = [
@@ -114,14 +136,21 @@ const createPdfContent = (doc: jsPDF, record: Record, settings: Settings | null)
     ];
 
     autoTable(doc, {
-        startY: 100,
+        startY: 125,
         head: [['Detay', 'Bilgi']],
         body: tableData,
         theme: 'striped',
-        headStyles: { fillColor: [41, 128, 185] },
-        alternateRowStyles: { fillColor: [245, 245, 245] },
+        headStyles: {
+            fillColor: [255, 255, 255],
+            textColor: [0, 0, 0],
+            fontStyle: 'bold',
+            lineWidth: 0.1,
+            lineColor: [200, 200, 200]
+        },
+        alternateRowStyles: { fillColor: [250, 250, 250] },
         styles: {
-            font: doc.getFontList().hasOwnProperty('Roboto') ? 'Roboto' : 'helvetica',
+            font: fontToUse,
+            textColor: [0, 0, 0],
             overflow: 'linebreak'
         },
         margin: { top: 100 },
@@ -129,8 +158,9 @@ const createPdfContent = (doc: jsPDF, record: Record, settings: Settings | null)
 
     // Footer / Delivery Info
     const finalY = (doc as any).lastAutoTable.finalY + 15;
-    doc.setFontSize(9);
-    doc.setTextColor(50);
+    doc.setFontSize(10);
+    doc.setFont(fontToUse, 'bold');
+    doc.setTextColor(0);
 
     let deliveryMsg = '';
     const day = record.daySelection || 1;
@@ -147,9 +177,9 @@ const createPdfContent = (doc: jsPDF, record: Record, settings: Settings | null)
         doc.text(splitMsg, 105, finalY, { align: 'center' });
     }
 
-    doc.setFontSize(8);
-    doc.setTextColor(150);
-    doc.text('Bu makbuz elektronik ortamda düzenlenmiştir.', 105, finalY + (deliveryMsg ? 15 : 5), { align: 'center' });
+    doc.setFont(fontToUse, 'normal');
+    doc.setFontSize(9);
+    doc.text('Bu makbuz elektronik ortamda düzenlenmiştir.', 105, finalY + (deliveryMsg ? 18 : 5), { align: 'center' });
 
     doc.save(`Makbuz_${record.orderNumber || record.ownerName.replace(/\s+/g, '_')}.pdf`);
 }

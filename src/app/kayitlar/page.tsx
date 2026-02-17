@@ -124,6 +124,9 @@ export default function KayitlarPage() {
 
     // Export PDF
     async function exportPdf() {
+        const robotoRegularUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf';
+        const robotoBoldUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Medium.ttf';
+
         try {
             const jsPDFModule = await import('jspdf');
             const jsPDF = jsPDFModule.default;
@@ -132,8 +135,37 @@ export default function KayitlarPage() {
 
             const doc = new jsPDF();
 
+            const loadFont = async (url: string, name: string, style: string) => {
+                try {
+                    const response = await fetch(url);
+                    const arrayBuffer = await response.arrayBuffer();
+                    const base64data = btoa(
+                        new Uint8Array(arrayBuffer)
+                            .reduce((data, byte) => data + String.fromCharCode(byte), '')
+                    );
+                    doc.addFileToVFS(`${name}-${style}.ttf`, base64data);
+                    doc.addFont(`${name}-${style}.ttf`, name, style);
+                    return true;
+                } catch (e) {
+                    console.error(`Font load failed: ${name} ${style}`, e);
+                    return false;
+                }
+            };
+
+            // Load fonts
+            await Promise.all([
+                loadFont(robotoRegularUrl, 'Roboto', 'normal'),
+                loadFont(robotoBoldUrl, 'Roboto', 'bold')
+            ]);
+
+            const fontToUse = doc.getFontList().hasOwnProperty('Roboto') ? 'Roboto' : 'helvetica';
+            doc.setFont(fontToUse, 'normal');
+
+            doc.setFont(fontToUse, 'bold');
             doc.setFontSize(18);
             doc.text('Kurban Hissedarları Listesi', 14, 22);
+
+            doc.setFont(fontToUse, 'normal');
             doc.setFontSize(11);
             doc.text(`Tarih: ${new Date().toLocaleDateString('tr-TR')}`, 14, 30);
 
@@ -166,8 +198,20 @@ export default function KayitlarPage() {
                 head: [tableColumn],
                 body: tableRows,
                 startY: 35,
-                styles: { fontSize: 8, cellPadding: 2 },
-                headStyles: { fillColor: [44, 62, 80] },
+                styles: {
+                    font: fontToUse,
+                    fontSize: 8,
+                    cellPadding: 2,
+                    textColor: [0, 0, 0]
+                },
+                headStyles: {
+                    fillColor: [255, 255, 255],
+                    textColor: [0, 0, 0],
+                    fontStyle: 'bold',
+                    lineWidth: 0.1,
+                    lineColor: [200, 200, 200]
+                },
+                alternateRowStyles: { fillColor: [250, 250, 250] },
             });
 
             doc.save(`kurban_listesi_${new Date().toLocaleDateString('tr-TR')}.pdf`);
@@ -289,7 +333,7 @@ export default function KayitlarPage() {
                         <span className="summary-label">Ödenen Tutar</span>
                     </div>
                     <div className="summary-item">
-                        <span className="summary-value" style={{ color: 'var(--accent-warning)' }}>{totalRemaining.toLocaleString('tr-TR')} ₺</span>
+                        <span className="summary-value" style={{ color: 'var(--accent-danger)' }}>{totalRemaining.toLocaleString('tr-TR')} ₺</span>
                         <span className="summary-label">Kalan Tutar</span>
                     </div>
                 </div>
@@ -431,7 +475,7 @@ export default function KayitlarPage() {
                                         <td style={{ fontWeight: 600 }}>{(r.totalPrice || 0).toLocaleString('tr-TR')} ₺</td>
                                         <td>
                                             <div style={{ color: 'var(--accent-success)', fontSize: 13 }}>{r.depositAmount.toLocaleString('tr-TR')} ₺</div>
-                                            {kalan > 0 && <div style={{ color: 'var(--accent-warning)', fontSize: 12, fontWeight: 500 }}>Kalan: {kalan.toLocaleString('tr-TR')} ₺</div>}
+                                            {kalan > 0 && <div style={{ color: 'var(--accent-danger)', fontSize: 12, fontWeight: 500 }}>Kalan: {kalan.toLocaleString('tr-TR')} ₺</div>}
                                         </td>
                                         <td style={{ fontSize: 13, fontWeight: 500 }}>
                                             {r.paymentType === 'nakit' ? 'Nakit' :

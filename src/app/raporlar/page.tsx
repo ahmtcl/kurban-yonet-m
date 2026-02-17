@@ -36,46 +36,93 @@ export default function RaporlarPage() {
     }
 
     // PDF Export
-    function exportPDF() {
-        const doc = new jsPDF();
+    async function exportPDF() {
+        const robotoRegularUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf';
+        const robotoBoldUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Medium.ttf';
 
-        // Add font
-        doc.setFont('Amiri-Regular');
-        doc.setFontSize(18);
-        doc.text('Kurban Yönetim Raporu', 14, 20);
+        try {
+            const doc = new jsPDF();
 
-        doc.setFontSize(12);
-        doc.text(`Tarih: ${new Date().toLocaleDateString('tr-TR')}`, 14, 30);
+            const loadFont = async (url: string, name: string, style: string) => {
+                try {
+                    const response = await fetch(url);
+                    const arrayBuffer = await response.arrayBuffer();
+                    const base64data = btoa(
+                        new Uint8Array(arrayBuffer)
+                            .reduce((data, byte) => data + String.fromCharCode(byte), '')
+                    );
+                    doc.addFileToVFS(`${name}-${style}.ttf`, base64data);
+                    doc.addFont(`${name}-${style}.ttf`, name, style);
+                    return true;
+                } catch (e) {
+                    console.error(`Font load failed: ${name} ${style}`, e);
+                    return false;
+                }
+            };
 
-        // Summary
-        const totalAmount = records.reduce((s, r) => s + (r.totalPrice || 0), 0);
-        const totalPaid = records.reduce((s, r) => s + (r.depositAmount || 0), 0);
+            // Load fonts
+            await Promise.all([
+                loadFont(robotoRegularUrl, 'Roboto', 'normal'),
+                loadFont(robotoBoldUrl, 'Roboto', 'bold')
+            ]);
 
-        doc.text(`Toplam Hissedar: ${records.length}`, 14, 40);
-        doc.text(`Toplam Tutar: ${totalAmount.toLocaleString('tr-TR')} TL`, 14, 46);
-        doc.text(`Toplanan: ${totalPaid.toLocaleString('tr-TR')} TL`, 14, 52);
-        doc.text(`Kalan: ${(totalAmount - totalPaid).toLocaleString('tr-TR')} TL`, 14, 58);
+            const fontToUse = doc.getFontList().hasOwnProperty('Roboto') ? 'Roboto' : 'helvetica';
+            doc.setFont(fontToUse, 'normal');
 
-        // Table
-        const tableData = records.map((r, i) => [
-            (i + 1).toString(),
-            r.ownerName,
-            r.shareTypeName || '-',
-            r.daySelection ? `${r.daySelection}. Gün` : '-',
-            (r.totalPrice || 0).toLocaleString('tr-TR'),
-            r.depositAmount.toLocaleString('tr-TR'),
-            ((r.totalPrice || 0) - r.depositAmount).toLocaleString('tr-TR')
-        ]);
+            // Header
+            doc.setFont(fontToUse, 'bold');
+            doc.setFontSize(18);
+            doc.setTextColor(0);
+            doc.text('Kurban Yönetim Raporu', 14, 20);
 
-        autoTable(doc, {
-            startY: 65,
-            head: [['#', 'Ad Soyad', 'Hisse', 'Gün', 'Toplam', 'Ödenen', 'Kalan']],
-            body: tableData,
-            styles: { font: 'Amiri-Regular', fontSize: 10 },
-            headStyles: { fillColor: [41, 128, 185] }
-        });
+            doc.setFont(fontToUse, 'normal');
+            doc.setFontSize(12);
+            doc.text(`Tarih: ${new Date().toLocaleDateString('tr-TR')}`, 14, 30);
 
-        doc.save(`rapor_${new Date().toISOString().split('T')[0]}.pdf`);
+            // Summary
+            const totalAmount = records.reduce((s, r) => s + (r.totalPrice || 0), 0);
+            const totalPaid = records.reduce((s, r) => s + (r.depositAmount || 0), 0);
+
+            doc.text(`Toplam Hissedar: ${records.length}`, 14, 40);
+            doc.text(`Toplam Tutar: ${totalAmount.toLocaleString('tr-TR')} TL`, 14, 46);
+            doc.text(`Toplanan: ${totalPaid.toLocaleString('tr-TR')} TL`, 14, 52);
+            doc.text(`Kalan: ${(totalAmount - totalPaid).toLocaleString('tr-TR')} TL`, 14, 58);
+
+            // Table
+            const tableData = records.map((r, i) => [
+                (i + 1).toString(),
+                r.ownerName,
+                r.shareTypeName || '-',
+                r.daySelection ? `${r.daySelection}. Gün` : '-',
+                (r.totalPrice || 0).toLocaleString('tr-TR'),
+                r.depositAmount.toLocaleString('tr-TR'),
+                ((r.totalPrice || 0) - r.depositAmount).toLocaleString('tr-TR')
+            ]);
+
+            autoTable(doc, {
+                startY: 65,
+                head: [['#', 'Ad Soyad', 'Hisse', 'Gün', 'Toplam', 'Ödenen', 'Kalan']],
+                body: tableData,
+                styles: {
+                    font: fontToUse,
+                    fontSize: 10,
+                    textColor: [0, 0, 0]
+                },
+                headStyles: {
+                    fillColor: [255, 255, 255],
+                    textColor: [0, 0, 0],
+                    fontStyle: 'bold',
+                    lineWidth: 0.1,
+                    lineColor: [200, 200, 200]
+                },
+                alternateRowStyles: { fillColor: [250, 250, 250] },
+            });
+
+            doc.save(`rapor_${new Date().toISOString().split('T')[0]}.pdf`);
+        } catch (error) {
+            console.error('PDF Export Error:', error);
+            alert('PDF oluşturulurken bir hata oluştu.');
+        }
     }
 
     if (loading) return <div className="loading"><div className="spinner" /></div>;
