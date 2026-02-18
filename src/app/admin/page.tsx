@@ -372,6 +372,67 @@ export default function AdminPage() {
                             </div>
                         )}
 
+                        {activeTab === 'shares' && isAdmin && (
+                            <div className="card">
+                                <h3 style={{ marginBottom: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <FiPlus /> Yeni Hisse Tipi Ekle
+                                </h3>
+                                <div className="form-row" style={{ background: '#f8fafc', padding: 15, borderRadius: 8, marginBottom: 20 }}>
+                                    <div className="form-group">
+                                        <label className="form-label">Hisse Adı</label>
+                                        <input className="form-input" value={newShareName} onChange={e => setNewShareName(e.target.value)} placeholder="Örn: 20-25 KG HİSSE" />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Fiyat (₺)</label>
+                                        <input type="number" className="form-input" value={newSharePrice} onChange={e => setNewSharePrice(e.target.value)} placeholder="0" />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Min KG</label>
+                                        <input type="number" className="form-input" value={newShareMinKg} onChange={e => setNewShareMinKg(e.target.value)} placeholder="0" />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Max KG</label>
+                                        <input type="number" className="form-input" value={newShareMaxKg} onChange={e => setNewShareMaxKg(e.target.value)} placeholder="0" />
+                                    </div>
+                                    <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
+                                        <button className="btn btn-primary" onClick={handleAddShareType} disabled={saving} style={{ height: 42 }}>
+                                            <FiPlus /> Ekle
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <h3>Mevcut Hisse Tipleri</h3>
+                                <div style={{ overflowX: 'auto' }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                        <thead>
+                                            <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
+                                                <th style={{ padding: 10 }}>Hisse Adı</th>
+                                                <th style={{ padding: 10 }}>Fiyat</th>
+                                                <th style={{ padding: 10 }}>KG Aralığı</th>
+                                                <th style={{ padding: 10 }}>İşlem</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {shareTypes.map(st => (
+                                                <tr key={st.id} style={{ borderBottom: '1px solid #eee' }}>
+                                                    <td style={{ padding: 10, fontWeight: 500 }}>{st.name}</td>
+                                                    <td style={{ padding: 10 }}>{st.price.toLocaleString('tr-TR')} ₺</td>
+                                                    <td style={{ padding: 10 }}>{st.minKg} - {st.maxKg} KG</td>
+                                                    <td style={{ padding: 10 }}>
+                                                        <button
+                                                            className="btn btn-sm btn-icon btn-danger"
+                                                            onClick={() => handleDeleteShareType(st.id)}
+                                                        >
+                                                            <FiTrash2 />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
                         {activeTab === 'users' && isAdmin && (
                             <div className="card">
                                 <h3 style={{ marginBottom: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
