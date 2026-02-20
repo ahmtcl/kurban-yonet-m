@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FiEdit, FiTrash2, FiPlus, FiSettings, FiX } from 'react-icons/fi';
+import { FiEdit, FiTrash2, FiPlus, FiSettings, FiX, FiDownload, FiCheckSquare, FiSquare } from 'react-icons/fi';
 import { getGroups, getShareTypes, getRecords, removeMemberFromGroup, updateRecord, updateGroup, deleteGroup, getSettings } from '@/lib/firestore';
 import type { Group, ShareType, Record } from '@/types';
 import RecordEditModal from '@/components/modals/RecordEditModal';
 import MoveToGroupModal from '@/components/modals/MoveToGroupModal';
 import AddMemberToGroupModal from '@/components/modals/AddMemberToGroupModal';
+import * as XLSX from 'xlsx';
 
 export default function GruplarPage() {
     const [groups, setGroups] = useState<Group[]>([]);
@@ -28,6 +29,9 @@ export default function GruplarPage() {
     const [selectedUnassignedIds, setSelectedUnassignedIds] = useState<string[]>([]);
     const [newGroupName, setNewGroupName] = useState('');
     const [newGroupShareType, setNewGroupShareType] = useState('');
+
+    // Group Selection for Export
+    const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
 
     // Group Edit
     const [editingGroup, setEditingGroup] = useState<Group | null>(null);
@@ -153,6 +157,110 @@ export default function GruplarPage() {
         (r.phone && r.phone.includes(unassignedSearch))
     );
 
+    // Group selection helpers
+    const allGroupIds = groups.map(g => g.id);
+    const allSelected = allGroupIds.length > 0 && allGroupIds.every(id => selectedGroupIds.includes(id));
+
+    function toggleSelectAllGroups() {
+        if (allSelected) {
+            setSelectedGroupIds([]);
+        } else {
+            setSelectedGroupIds([...allGroupIds]);
+        }
+    }
+
+    function toggleGroupSelection(groupId: string) {
+        setSelectedGroupIds(prev =>
+            prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId]
+        );
+    }
+
+    function exportSelectedGroupsToExcel() {
+        const selectedGroups = groups.filter(g => selectedGroupIds.includes(g.id));
+
+        // Build rows: each member as a row
+        type ExcelRow = {
+            'Hisse Tipi': string;
+            'Grup Adı': string;
+            'Sıra No': number;
+            'Ad Soyad': string;
+            'Telefon': string;
+            'Ödeme Türü': string;
+            'Toplam Tutar (₺)': string | number;
+            'Kapora (₺)': string | number;
+            'Kalan (₺)': string | number;
+        };
+
+        const rows: ExcelRow[] = [];
+
+        // Sort selected groups: first by shareType name (alphabetical), then by group name
+        const sortedGroups = [...selectedGroups].sort((a, b) => {
+            const stA = shareTypes.find(st => st.id === a.shareTypeId);
+            const stB = shareTypes.find(st => st.id === b.shareTypeId);
+            const nameA = stA ? `${stA.minKg ?? ''}-${stA.maxKg ?? ''} ${stA.name}` : a.shareTypeId;
+            const nameB = stB ? `${stB.minKg ?? ''}-${stB.maxKg ?? ''} ${stB.name}` : b.shareTypeId;
+            if (nameA !== nameB) return nameA.localeCompare(nameB, 'tr');
+            return a.name.localeCompare(b.name, 'tr');
+        });
+
+        sortedGroups.forEach(group => {
+            const shareType = shareTypes.find(st => st.id === group.shareTypeId);
+            const shareTypeName = shareType ? shareType.name : group.shareTypeName || 'Bilinmiyor';
+            const members = group.memberIds
+                .map(id => records.find(r => r.id === id))
+                .filter(r => !!r) as Record[];
+
+            members.forEach((member, index) => {
+                rows.push({
+                    'Hisse Tipi': shareTypeName,
+                    'Grup Adı': group.name,
+                    'Sıra No': index + 1,
+                    'Ad Soyad': member.ownerName || '',
+                    'Telefon': member.phone || '',
+                    'Ödeme Türü': member.paymentType || '',
+                    'Toplam Tutar (₺)': member.totalPrice ?? '',
+                    'Kapora (₺)': member.depositAmount ?? '',
+                    'Kalan (₺)': member.totalPrice != null && member.depositAmount != null
+                        ? member.totalPrice - member.depositAmount
+                        : '',
+                });
+            });
+
+            // Empty separator row between groups
+            rows.push({
+                'Hisse Tipi': '',
+                'Grup Adı': '',
+                'Sıra No': 0,
+                'Ad Soyad': '',
+                'Telefon': '',
+                'Ödeme Türü': '',
+                'Toplam Tutar (₺)': '',
+                'Kapora (₺)': '',
+                'Kalan (₺)': '',
+            });
+        });
+
+        const ws = XLSX.utils.json_to_sheet(rows);
+
+        // Column widths
+        ws['!cols'] = [
+            { wch: 20 }, // Hisse Tipi
+            { wch: 20 }, // Grup Adı
+            { wch: 8 },  // Sıra No
+            { wch: 25 }, // Ad Soyad
+            { wch: 15 }, // Telefon
+            { wch: 18 }, // Ödeme Durumu
+            { wch: 18 }, // Toplam
+            { wch: 14 }, // Ödenen
+            { wch: 14 }, // Kalan
+        ];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Gruplar');
+        const fileName = `Gruplar_${new Date().toLocaleDateString('tr-TR').replace(/\./g, '-')}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+    }
+
     // Grouping logic
     const groupsByShareType = shareTypes.map(st => {
         const typeGroups = groups.filter(g => g.shareTypeId === st.id);
@@ -173,12 +281,45 @@ export default function GruplarPage() {
         <>
             <div className="top-bar">
                 <h2>👥 Gruplar ve Hissedarlar</h2>
-                <button className="btn btn-primary btn-sm" onClick={() => {
-                    setRefreshTrigger(prev => prev + 1);
-                    alert('Veriler yenilendi.');
-                }}>
-                    Yenile
-                </button>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {selectedGroupIds.length > 0 && (
+                        <span style={{
+                            background: 'var(--accent-primary)',
+                            color: '#fff',
+                            borderRadius: 20,
+                            padding: '2px 10px',
+                            fontSize: 13,
+                            fontWeight: 600
+                        }}>
+                            {selectedGroupIds.length} grup seçili
+                        </span>
+                    )}
+                    <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={toggleSelectAllGroups}
+                        title={allSelected ? 'Seçimi Kaldır' : 'Tümünü Seç'}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5 }}
+                    >
+                        {allSelected ? <FiCheckSquare /> : <FiSquare />}
+                        {allSelected ? 'Seçimi Kaldır' : 'Tümünü Seç'}
+                    </button>
+                    <button
+                        className="btn btn-success btn-sm"
+                        onClick={exportSelectedGroupsToExcel}
+                        disabled={selectedGroupIds.length === 0}
+                        title="Seçili grupları Excel'e aktar"
+                        style={{ display: 'flex', alignItems: 'center', gap: 5 }}
+                    >
+                        <FiDownload /> Excel'e Aktar
+                        {selectedGroupIds.length > 0 && ` (${selectedGroupIds.length})`}
+                    </button>
+                    <button className="btn btn-primary btn-sm" onClick={() => {
+                        setRefreshTrigger(prev => prev + 1);
+                        alert('Veriler yenilendi.');
+                    }}>
+                        Yenile
+                    </button>
+                </div>
             </div>
 
             <div className="page-content" style={{ paddingBottom: 50 }}>
@@ -294,13 +435,22 @@ export default function GruplarPage() {
                                         {/* Group Header */}
                                         <div style={{
                                             padding: '12px 16px',
-                                            background: '#2c3e50',
+                                            background: selectedGroupIds.includes(group.id) ? '#1a5276' : '#2c3e50',
                                             color: '#fff',
                                             display: 'flex',
                                             justifyContent: 'space-between',
-                                            alignItems: 'center'
+                                            alignItems: 'center',
+                                            transition: 'background 0.2s'
                                         }}>
-                                            <span style={{ fontWeight: 600, fontSize: 16 }}>{group.name}</span>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', flex: 1 }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedGroupIds.includes(group.id)}
+                                                    onChange={() => toggleGroupSelection(group.id)}
+                                                    style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#27ae60' }}
+                                                />
+                                                <span style={{ fontWeight: 600, fontSize: 16 }}>{group.name}</span>
+                                            </label>
                                             <button
                                                 className="btn btn-icon btn-sm btn-ghost"
                                                 style={{ color: '#fff', opacity: 0.8 }}
