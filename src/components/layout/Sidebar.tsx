@@ -30,6 +30,8 @@ export default function Sidebar() {
     const pathname = usePathname();
     const { isAdmin, user, logout } = useAuth();
 
+    if (!user) return null;
+
     return (
         <aside className="sidebar">
             <div className="sidebar-logo">

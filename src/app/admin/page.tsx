@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { FiLock, FiSettings, FiTag, FiLogOut, FiSave, FiPlus, FiTrash2, FiList, FiSearch, FiEdit, FiUsers, FiUserPlus, FiUserCheck, FiUserX } from 'react-icons/fi';
+import { FiLock, FiSettings, FiTag, FiLogOut, FiSave, FiPlus, FiTrash2, FiList, FiSearch, FiEdit, FiUsers, FiUserPlus, FiUserCheck, FiUserX, FiMessageSquare } from 'react-icons/fi';
 import { getSettings, updateSettings, getShareTypes, addShareType, deleteShareType, getRecords, getUsers, addUser, updateUser, deleteUser, getGroups } from '@/lib/firestore';
 import type { Settings, ShareType, Record as RecordType, User, UserRole, Group } from '@/types';
 import RecordEditModal from '@/components/modals/RecordEditModal';
@@ -366,9 +366,90 @@ export default function AdminPage() {
                                         </select>
                                     </div>
                                 </div>
-                                <button className="btn btn-success" onClick={handleSaveSettings} disabled={saving}>
+                                <button className="btn btn-success" onClick={handleSaveSettings} disabled={saving} style={{ marginBottom: 30 }}>
                                     <FiSave /> {saving ? 'Kaydediliyor...' : 'Ayarları Kaydet'}
                                 </button>
+
+                                <div style={{ borderTop: '1px solid #eee', paddingTop: 20 }}>
+                                    <h3 style={{ marginBottom: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <FiMessageSquare /> SMS Şablonları Yönetimi
+                                    </h3>
+                                    <p style={{ fontSize: 13, color: '#666', marginBottom: 15 }}>
+                                        Kayıt düzenleme ekranında hızlıca kullanabileceğiniz mesaj şablonlarını buradan yönetebilirsiniz.
+                                        <br />
+                                        <span style={{ color: 'var(--accent-primary)', fontWeight: 500 }}>Değişkenler:</span> {`{AD_SOYAD}, {SIPARIS_NO}, {KESIM_GUNU}`}
+                                    </p>
+
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 15, marginBottom: 20 }}>
+                                        {settings.smsTemplates?.map((template, index) => (
+                                            <div key={template.id} style={{ background: '#f8fafc', padding: 15, borderRadius: 8, border: '1px solid #e2e8f0', position: 'relative' }}>
+                                                <button
+                                                    className="btn btn-icon btn-sm btn-ghost"
+                                                    style={{ position: 'absolute', right: 10, top: 10, color: 'var(--accent-danger)' }}
+                                                    onClick={() => {
+                                                        const newTemplates = [...settings.smsTemplates];
+                                                        newTemplates.splice(index, 1);
+                                                        setSettings({ ...settings, smsTemplates: newTemplates });
+                                                    }}
+                                                >
+                                                    <FiTrash2 />
+                                                </button>
+                                                <div className="form-group">
+                                                    <label className="form-label" style={{ fontSize: 12 }}>Şablon Başlığı</label>
+                                                    <input
+                                                        className="form-input"
+                                                        value={template.label}
+                                                        onChange={(e) => {
+                                                            const newTemplates = [...settings.smsTemplates];
+                                                            newTemplates[index].label = e.target.value;
+                                                            setSettings({ ...settings, smsTemplates: newTemplates });
+                                                        }}
+                                                        placeholder="Örn: Ödeme Hatırlatma"
+                                                    />
+                                                </div>
+                                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                                    <label className="form-label" style={{ fontSize: 12 }}>Mesaj Metni</label>
+                                                    <textarea
+                                                        className="form-textarea"
+                                                        value={template.text}
+                                                        onChange={(e) => {
+                                                            const newTemplates = [...settings.smsTemplates];
+                                                            newTemplates[index].text = e.target.value;
+                                                            setSettings({ ...settings, smsTemplates: newTemplates });
+                                                        }}
+                                                        placeholder="Mesaj içeriği..."
+                                                        rows={2}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <button
+                                        className="btn btn-ghost btn-outline-primary"
+                                        style={{ width: '100%', borderStyle: 'dashed', marginBottom: 15 }}
+                                        onClick={() => {
+                                            const newTemplates = [...(settings.smsTemplates || [])];
+                                            newTemplates.push({
+                                                id: Math.random().toString(36).substr(2, 9),
+                                                label: '',
+                                                text: ''
+                                            });
+                                            setSettings({ ...settings, smsTemplates: newTemplates });
+                                        }}
+                                    >
+                                        <FiPlus /> Yeni Şablon Ekle
+                                    </button>
+
+                                    <button
+                                        className="btn btn-success"
+                                        style={{ width: '100%' }}
+                                        onClick={handleSaveSettings}
+                                        disabled={saving}
+                                    >
+                                        <FiSave /> {saving ? 'Kaydediliyor...' : 'Şablonları Kaydet'}
+                                    </button>
+                                </div>
                             </div>
                         )}
 

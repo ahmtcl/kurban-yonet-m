@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { FiX, FiPlus, FiSearch } from 'react-icons/fi';
-import { getRecords, addMemberToGroup, updateRecord } from '@/lib/firestore';
-import type { Record, Group } from '@/types';
+import { getRecords, addMemberToGroup, updateRecord, getShareTypes } from '@/lib/firestore';
+import type { Record, Group, ShareType } from '@/types';
 
 interface AddMemberToGroupModalProps {
     group: Group;
@@ -13,6 +13,7 @@ interface AddMemberToGroupModalProps {
 
 export default function AddMemberToGroupModal({ group, onClose, onSuccess }: AddMemberToGroupModalProps) {
     const [records, setRecords] = useState<Record[]>([]);
+    const [shareTypes, setShareTypes] = useState<ShareType[]>([]);
     const [selectedRecordIds, setSelectedRecordIds] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -24,13 +25,24 @@ export default function AddMemberToGroupModal({ group, onClose, onSuccess }: Add
 
     async function loadEligibleRecords() {
         try {
-            const allRecords = await getRecords();
-            // Filter: Same ShareType AND No Group (or different group? User said "register gathered people here", implies taking loose records)
-            // Sticking to: Same ShareType AND (No Group OR GroupId is null)
-            const eligible = allRecords.filter(r =>
-                r.shareTypeId === group.shareTypeId &&
-                (!r.groupId || r.groupId === '')
-            );
+            const [allRecords, allShareTypes] = await Promise.all([
+                getRecords(),
+                getShareTypes()
+            ]);
+            setShareTypes(allShareTypes);
+
+            const groupST = allShareTypes.find(st => st.id === group.shareTypeId);
+
+            const eligible = allRecords.filter(r => {
+                // Not in a group
+                if (r.groupId && r.groupId !== '') return false;
+
+                // Check kilo range compatibility
+                const memberST = allShareTypes.find(st => st.id === r.shareTypeId);
+                if (!groupST || !memberST) return r.shareTypeId === group.shareTypeId;
+
+                return groupST.minKg === memberST.minKg && groupST.maxKg === memberST.maxKg;
+            });
             setRecords(eligible);
         } catch (error) {
             console.error(error);
@@ -76,7 +88,7 @@ export default function AddMemberToGroupModal({ group, onClose, onSuccess }: Add
 
                 <div className="modal-body">
                     <p style={{ marginBottom: 15, color: '#666', fontSize: 13 }}>
-                        Sadece <strong>{group.shareTypeName}</strong> hissesine sahip ve herhangi bir gruba atanmamış kişiler listelenmektedir.
+                        <strong>{group.shareTypeName}</strong> ile aynı kilo aralığında olan ve herhangi bir gruba atanmamış kişiler listelenmektedir.
                     </p>
 
                     <div className="search-bar" style={{ marginBottom: 15 }}>

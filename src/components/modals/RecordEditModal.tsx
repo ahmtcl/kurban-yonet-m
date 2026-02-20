@@ -25,6 +25,7 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
 
     // OTP State
     const [otpSent, setOtpSent] = useState(false);
+    const [sendSmsToggle, setSendSmsToggle] = useState(true); // New toggle state
     const [serverOtp, setServerOtp] = useState('');
     const [userOtp, setUserOtp] = useState('');
 
@@ -32,11 +33,13 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
     const [customMessage, setCustomMessage] = useState('');
     const [sendingSms, setSendingSms] = useState(false);
 
-    const smsTemplates = [
-        { label: 'Ödeme Hatırlatma', text: `SAYIN ${record?.ownerName}, KURBAN KAYDINIZ ICIN ODEME BEKLENMEKTEDIR. BILGINIZE.` },
-        { label: 'Grup Bilgisi', text: `SAYIN ${record?.ownerName}, KURBAN GRUBUNUZ OLUSTURULMUSTUR. SIPARIS NO: ${record?.orderNumber}.` },
-        { label: 'Kesim Günü', text: `SAYIN ${record?.ownerName}, KURBANINIZ ${record?.daySelection}. GUN KESILECEKTIR.` },
-    ];
+    const replaceVariables = (text: string) => {
+        if (!record) return text;
+        return text
+            .replace(/{AD_SOYAD}/g, record.ownerName)
+            .replace(/{SIPARIS_NO}/g, record.orderNumber?.toString() || '')
+            .replace(/{KESIM_GUNU}/g, record.daySelection?.toString() || '');
+    };
 
     useEffect(() => {
         setEditRecord(record);
@@ -64,7 +67,13 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
             return;
         }
 
-        // If Normal User, send OTP
+        // If SMS toggle is OFF, proceed directly without OTP
+        if (!sendSmsToggle) {
+            await executeUpdate();
+            return;
+        }
+
+        // If Normal User and SMS toggle is ON, send OTP
         setSaving(true);
         const code = generateOTP();
         setServerOtp(code);
@@ -131,8 +140,8 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
                 }
             }
 
-            // Send Confirmation SMS if not in Admin View (i.e., triggered by OTP flow)
-            if (!isAdminView) {
+            // Send Confirmation SMS if not in Admin View (i.e., triggered by OTP flow) AND toggle is ON
+            if (!isAdminView && sendSmsToggle) {
                 const targetPhone = editRecord.phone || editRecord.phoneBackup;
                 if (targetPhone) {
                     const confirmMessage = `SAYIN MUSTERIMIZ , ${editRecord.shareTypeName} KURBAN SIPARISINIZ GUNCELENMISTIR. SIPARIS NO: ${editRecord.orderNumber || ''} ALLAH KABUL ETSIN.`;
@@ -351,7 +360,12 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
                             >
                                 <option value="">--- Gruptan Çıkar / Grupsuz ---</option>
                                 {groups
-                                    .filter(g => g.shareTypeId === editRecord.shareTypeId)
+                                    .filter(g => {
+                                        const groupST = shareTypes.find(st => st.id === g.shareTypeId);
+                                        const currentST = shareTypes.find(st => st.id === editRecord.shareTypeId);
+                                        if (!groupST || !currentST) return g.shareTypeId === editRecord.shareTypeId;
+                                        return groupST.minKg === currentST.minKg && groupST.maxKg === currentST.maxKg;
+                                    })
                                     .map(g => (
                                         <option key={g.id} value={g.id}>
                                             {g.name} ({g.memberIds.length} Üye)
@@ -360,7 +374,7 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
                                 }
                             </select>
                             <p style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
-                                * Sadece <strong>{editRecord.shareTypeName}</strong> hissesine uygun gruplar listelenmektedir.
+                                * <strong>{editRecord.shareTypeName}</strong> ile aynı kilo aralığındaki tüm gruplar listelenmektedir.
                             </p>
                         </div>
 
@@ -388,12 +402,12 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
                                 />
                             </div>
                             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 15 }}>
-                                {smsTemplates.map(t => (
+                                {settings?.smsTemplates?.map(t => (
                                     <button
-                                        key={t.label}
+                                        key={t.id}
                                         className="btn btn-xs btn-ghost"
                                         style={{ fontSize: 11, padding: '2px 8px', border: '1px solid #ccc' }}
-                                        onClick={() => setCustomMessage(t.text)}
+                                        onClick={() => setCustomMessage(replaceVariables(t.text))}
                                     >
                                         {t.label}
                                     </button>
@@ -432,6 +446,16 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
 
                             <div style={{ display: 'flex', gap: '10px' }}>
                                 <button className="btn btn-ghost" onClick={onClose} disabled={saving}>İptal</button>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <input
+                                        type="checkbox"
+                                        id="send-sms-toggle-edit"
+                                        checked={sendSmsToggle}
+                                        onChange={(e) => setSendSmsToggle(e.target.checked)}
+                                        style={{ width: 18, height: 18, cursor: 'pointer' }}
+                                    />
+                                    <label htmlFor="send-sms-toggle-edit" style={{ fontSize: 13, cursor: 'pointer', fontWeight: 600, color: 'var(--accent-primary)' }}>Müşteriye SMS Gönder</label>
+                                </div>
                                 <button className="btn btn-primary" onClick={handleRequestUpdate} disabled={saving}>
                                     <FiCheck /> {isAdmin ? 'Güncelle' : 'Doğrula ve Güncelle'}
                                 </button>

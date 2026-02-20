@@ -267,6 +267,11 @@ export async function getSettings(): Promise<Settings> {
             activeDay: 1,
             moveButtonEnabled: true,
             lastOrderNumber: 59793, // Initialize with 59793 so next is 59794
+            smsTemplates: [
+                { id: '1', label: 'Ödeme Hatırlatma', text: 'SAYIN {AD_SOYAD}, KURBAN KAYDINIZ ICIN ODEME BEKLENMEKTEDIR. BILGINIZE.' },
+                { id: '2', label: 'Grup Bilgisi', text: 'SAYIN {AD_SOYAD}, KURBAN GRUBUNUZ OLUSTURULMUSTUR. SIPARIS NO: {SIPARIS_NO}.' },
+                { id: '3', label: 'Kesim Günü', text: 'SAYIN {AD_SOYAD}, KURBANINIZ {KESIM_GUNU}. GUN KESILECEKTIR.' },
+            ],
         };
         await setDoc(doc(db, 'settings', 'general'), defaults);
         return defaults;

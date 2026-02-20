@@ -103,12 +103,29 @@ export default function GruplarPage() {
         if (!newGroupName.trim() || !newGroupShareType || selectedUnassignedIds.length === 0) return;
         try {
             const st = shareTypes.find(s => s.id === newGroupShareType);
+            if (!st) return;
+
+            // NEW: Compatibility Check
+            const incompatibleMembers = selectedUnassignedIds.map(id => records.find(r => r.id === id)).filter(r => {
+                if (!r) return false;
+                const memberST = shareTypes.find(mst => mst.id === r.shareTypeId);
+                if (!memberST) return false;
+                return memberST.minKg !== st.minKg || memberST.maxKg !== st.maxKg;
+            });
+
+            if (incompatibleMembers.length > 0) {
+                const confirmMix = confirm(
+                    `Seçtiğiniz ${incompatibleMembers.length} kişinin kilo aralığı, grup tipi (${st.name}) ile tam eşleşmiyor. \n\nYine de devam etmek istiyor musunuz?`
+                );
+                if (!confirmMix) return;
+            }
+
             const { addGroup, addMemberToGroup } = await import('@/lib/firestore');
 
             const groupRef = await addGroup({
                 name: newGroupName.trim(),
                 shareTypeId: newGroupShareType,
-                shareTypeName: st?.name || '',
+                shareTypeName: st.name || '',
                 description: `${selectedUnassignedIds.length} kişi ile oluşturuldu.`,
                 memberIds: []
             });

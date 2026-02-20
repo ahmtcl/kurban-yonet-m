@@ -8,6 +8,12 @@ export interface ShareType {
     createdAt: Date;
 }
 
+export interface SMSTemplate {
+    id: string;
+    label: string;
+    text: string;
+}
+
 export type UserRole = 'admin' | 'employee';
 
 export interface User {
@@ -65,6 +71,7 @@ export interface Settings {
     activeDay: 1 | 2 | 3; // Locked day for new records
     moveButtonEnabled: boolean;
     lastOrderNumber?: number; // Added for auto-increment
+    smsTemplates: SMSTemplate[]; // New dynamic templates
 }
 
 export interface DashboardStats {

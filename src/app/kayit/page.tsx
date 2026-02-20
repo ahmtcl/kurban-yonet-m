@@ -47,6 +47,7 @@ export default function YeniKayit() {
 
     // OTP State
     const [otpSent, setOtpSent] = useState(false);
+    const [sendSmsToggle, setSendSmsToggle] = useState(true); // New toggle state
     const [serverOtp, setServerOtp] = useState('');
     const [userOtp, setUserOtp] = useState('');
 
@@ -106,6 +107,12 @@ export default function YeniKayit() {
             return;
         }
 
+        // If SMS toggle is OFF, bypass OTP and save directly
+        if (!sendSmsToggle) {
+            await handleVerifyAndSave(true);
+            return;
+        }
+
         setSaving(true);
         try {
             // Send SMS Verification Code
@@ -136,8 +143,8 @@ export default function YeniKayit() {
         }
     }
 
-    async function handleVerifyAndSave() {
-        if (userOtp !== serverOtp) {
+    async function handleVerifyAndSave(isBypassed: boolean = false) {
+        if (!isBypassed && userOtp !== serverOtp) {
             showToast('error', 'Hatalı doğrulama kodu!');
             return;
         }
@@ -157,7 +164,7 @@ export default function YeniKayit() {
                 groupId: assignedGroupId,
                 daySelection: settings?.activeDay || 1,
                 notes,
-                smsVerified: true,
+                smsVerified: sendSmsToggle, // Use toggle value
                 status: 'waiting_approval' as const,
                 createdBy: user?.fullName || 'Bilinmiyor',
                 createdById: user?.id || '',
@@ -176,9 +183,11 @@ export default function YeniKayit() {
                 await addMemberToGroup(assignedGroupId, docRef.id);
             }
 
-            // 3. Send Confirmation SMS
-            const confirmMessage = `SAYIN MUSTERIMIZ , ${selectedShareType?.name || ''} KURBAN SIPARISINIZ ALINMISTIR. KURBANINIZI BAYRAMIN 1. GUNU OLAN 27.05.2026 ÇARŞAMBA GUNU 18:00-23:00 SAATLERİ ICINDE TESLIM ALABILIRSINIZ. ALLAH KABUL ETSIN SIPARIS NO: ${orderNo}`;
-            await sendSMS(phone, confirmMessage);
+            // 3. Send Confirmation SMS if toggle is ON
+            if (sendSmsToggle) {
+                const confirmMessage = `SAYIN MUSTERIMIZ , ${selectedShareType?.name || ''} KURBAN SIPARISINIZ ALINMISTIR. KURBANINIZI BAYRAMIN 1. GUNU OLAN 27.05.2026 ÇARŞAMBA GUNU 18:00-23:00 SAATLERİ ICINDE TESLIM ALABILIRSINIZ. ALLAH KABUL ETSIN SIPARIS NO: ${orderNo}`;
+                await sendSMS(phone, confirmMessage);
+            }
 
             showToast('success', 'Kayıt başarıyla oluşturuldu ve onay SMS\'i gönderildi!');
 
@@ -453,7 +462,18 @@ export default function YeniKayit() {
                         />
                     </div>
 
-                    <div style={{ marginTop: 20, display: 'flex', gap: 10 }}>
+                    <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', gap: 15 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <input
+                                type="checkbox"
+                                id="send-sms-toggle"
+                                checked={sendSmsToggle}
+                                onChange={(e) => setSendSmsToggle(e.target.checked)}
+                                style={{ width: 18, height: 18, cursor: 'pointer' }}
+                            />
+                            <label htmlFor="send-sms-toggle" style={{ fontSize: 14, cursor: 'pointer', fontWeight: 600, color: 'var(--accent-primary)' }}>Müşteriye SMS Gönder</label>
+                        </div>
+
                         <button type="submit" className="btn btn-success" disabled={saving}>
                             {saving ? 'Kaydediliyor...' : 'Kaydı Tamamla'}
                         </button>
@@ -510,7 +530,7 @@ export default function YeniKayit() {
                                     <button
                                         type="button"
                                         className="btn btn-primary"
-                                        onClick={handleVerifyAndSave}
+                                        onClick={() => handleVerifyAndSave(false)}
                                         disabled={saving || userOtp.length !== 6}
                                         style={{ minWidth: 160 }}
                                     >
