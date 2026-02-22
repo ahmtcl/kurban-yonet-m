@@ -717,16 +717,137 @@ tr:last-child td {
   }
 }
 
-/* Responsive */
+/* ===================== */
+/* MOBILE NAVBAR         */
+/* ===================== */
+.mobile-navbar {
+  display: none;
+}
+
+/* ===================== */
+/* SIDEBAR CLOSE BUTTON  */
+/* ===================== */
+.sidebar-close-btn {
+  display: none;
+}
+
+/* ===================== */
+/* SIDEBAR BACKDROP      */
+/* ===================== */
+.sidebar-backdrop {
+  display: none;
+}
+
+/* ===================== */
+/* RESPONSIVE — MOBILE   */
+/* ===================== */
 @media (max-width: 768px) {
-  .sidebar {
-    display: none;
+
+  /* Mobile top navbar */
+  .mobile-navbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background: #fff;
+    border-bottom: 1px solid #ddd;
+    padding: 0 12px;
+    z-index: 150;
   }
 
+  .mobile-navbar-logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #333;
+  }
+
+  .mobile-navbar-logo .logo-icon {
+    width: 28px;
+    height: 28px;
+    background: var(--accent-primary);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    color: white;
+    flex-shrink: 0;
+  }
+
+  .mobile-menu-btn,
+  .mobile-logout-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 22px;
+    color: #444;
+  }
+
+  .mobile-menu-btn:hover,
+  .mobile-logout-btn:hover {
+    background: #f0f0f0;
+  }
+
+  /* Sidebar: hidden by default on mobile, slides in when open */
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 200;
+  }
+
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  /* Close button inside sidebar — visible on mobile */
+  .sidebar-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 18px;
+    color: #666;
+  }
+
+  .sidebar-close-btn:hover {
+    background: #f0f0f0;
+  }
+
+  /* Backdrop overlay behind open sidebar */
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 190;
+  }
+
+  /* Main content: no left margin, add top padding for navbar */
   .main-content {
     margin-left: 0;
+    padding-top: 56px;
   }
 
+  /* Grid layouts collapse to single column */
   .form-row,
   .form-row-3 {
     grid-template-columns: 1fr;
@@ -738,5 +859,66 @@ tr:last-child td {
 
   .page-content {
     padding: 12px;
+  }
+
+  /* Touch-friendly buttons */
+  .btn {
+    min-height: 40px;
+  }
+
+  /* Modal takes full width on small screens */
+  .modal {
+    width: 96%;
+    max-height: 90vh;
+  }
+
+  /* Filter bar stacks vertically */
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-input {
+    min-width: 100%;
+  }
+
+  /* Table scrolls horizontally */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Modal footer stacks buttons vertically on very small screens */
+  .modal-footer {
+    flex-wrap: wrap;
+  }
+
+  /* Top bar inside pages: adjust for mobile */
+  .top-bar {
+    padding: 10px 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .top-bar-actions {
+    flex-wrap: wrap;
+  }
+
+  /* Summary bar scrolls horizontally */
+  .summary-bar {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    gap: 16px;
+  }
+}
+
+/* Extra small screens (phones < 400px) */
+@media (max-width: 400px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-navbar-logo span {
+    display: none;
   }
 }

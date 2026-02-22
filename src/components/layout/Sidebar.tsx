@@ -11,7 +11,8 @@ import {
     FiSettings,
     FiTag,
     FiRefreshCw,
-    FiLogOut
+    FiLogOut,
+    FiX
 } from 'react-icons/fi';
 import { GiCow } from 'react-icons/gi';
 import { useAuth } from '@/context/AuthContext';
@@ -26,58 +27,79 @@ const navItems = [
     { href: '/admin', label: 'Admin Panel', icon: <FiSettings />, adminOnly: true },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+    isOpen?: boolean;
+    onClose?: () => void;
+}
+
+export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     const pathname = usePathname();
     const { isAdmin, user, logout } = useAuth();
 
     if (!user) return null;
 
-    return (
-        <aside className="sidebar">
-            <div className="sidebar-logo">
-                <div className="logo-icon">
-                    <GiCow />
-                </div>
-                <h1>Kurban Yönetim</h1>
-            </div>
-            <nav className="sidebar-nav">
-                {navItems.map((item) => {
-                    if (item.adminOnly && !isAdmin) return null;
+    const handleNavClick = () => {
+        if (onClose) onClose();
+    };
 
-                    const isActive =
-                        item.href === '/'
-                            ? pathname === '/'
-                            : pathname.startsWith(item.href);
-                    return (
-                        <Link
-                            key={item.href}
-                            href={item.href}
-                            className={`nav-item ${isActive ? 'active' : ''}`}
-                        >
-                            <span className="nav-icon">{item.icon}</span>
-                            {item.label}
-                        </Link>
-                    );
-                })}
-            </nav>
-            <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <button
-                    className="btn btn-ghost"
-                    style={{ width: '100%', justifyContent: 'center' }}
-                    onClick={() => window.location.reload()}
-                >
-                    <FiRefreshCw /> Yenile (F5)
-                </button>
-                {user && (
-                    <button
-                        className="btn btn-outline-danger"
-                        style={{ width: '100%', justifyContent: 'center' }}
-                        onClick={() => logout()}
-                    >
-                        <FiLogOut /> Çıkış Yap
+    return (
+        <>
+            {/* Mobile backdrop */}
+            {isOpen && (
+                <div className="sidebar-backdrop" onClick={onClose} />
+            )}
+
+            <aside className={`sidebar ${isOpen ? 'sidebar-open' : ''}`}>
+                <div className="sidebar-logo">
+                    <div className="logo-icon">
+                        <GiCow />
+                    </div>
+                    <h1>Kurban Yönetim</h1>
+                    {/* Close button only visible on mobile */}
+                    <button className="sidebar-close-btn" onClick={onClose} aria-label="Menüyü Kapat">
+                        <FiX />
                     </button>
-                )}
-            </div>
-        </aside>
+                </div>
+                <nav className="sidebar-nav">
+                    {navItems.map((item) => {
+                        if (item.adminOnly && !isAdmin) return null;
+
+                        const isActive =
+                            item.href === '/'
+                                ? pathname === '/'
+                                : pathname.startsWith(item.href);
+                        return (
+                            <Link
+                                key={item.href}
+                                href={item.href}
+                                className={`nav-item ${isActive ? 'active' : ''}`}
+                                onClick={handleNavClick}
+                            >
+                                <span className="nav-icon">{item.icon}</span>
+                                {item.label}
+                            </Link>
+                        );
+                    })}
+                </nav>
+                <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <button
+                        className="btn btn-ghost"
+                        style={{ width: '100%', justifyContent: 'center' }}
+                        onClick={() => window.location.reload()}
+                    >
+                        <FiRefreshCw /> Yenile (F5)
+                    </button>
+                    {user && (
+                        <button
+                            className="btn btn-outline-danger"
+                            style={{ width: '100%', justifyContent: 'center' }}
+                            onClick={() => logout()}
+                        >
+                            <FiLogOut /> Çıkış Yap
+                        </button>
+                    )}
+                </div>
+            </aside>
+        </>
     );
 }

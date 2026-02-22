@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import Sidebar from "@/components/layout/Sidebar";
 import { AuthProvider } from "@/context/AuthContext";
 import AuthGuard from "@/components/auth/AuthGuard";
+import AppLayout from "@/components/layout/AppLayout";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,12 +22,9 @@ export default function RootLayout({
       <body className={`${inter.className} antialiased`} suppressHydrationWarning={true}>
         <AuthProvider>
           <AuthGuard>
-            <div className="layout-container">
-              <Sidebar />
-              <main className="main-content">
-                {children}
-              </main>
-            </div>
+            <AppLayout>
+              {children}
+            </AppLayout>
           </AuthGuard>
         </AuthProvider>
       </body>
