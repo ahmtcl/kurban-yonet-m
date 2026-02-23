@@ -56,14 +56,15 @@ export default function Dashboard() {
     }
   }
 
-  // Calculations
-  const totalRevenue = records.reduce((s, r) => s + (r.totalPrice || 0), 0);
-  const totalCollected = records.reduce((s, r) => s + (r.depositAmount || 0), 0);
+  // Calculations (Excluding cancelled records)
+  const activeRecords = records.filter(r => r.status !== 'cancelled');
+  const totalRevenue = activeRecords.reduce((s, r) => s + (r.totalPrice || 0), 0);
+  const totalCollected = activeRecords.reduce((s, r) => s + (r.depositAmount || 0), 0);
   const totalRemaining = totalRevenue - totalCollected;
   const now = new Date();
 
-  // Due Records Logic
-  const overdueRecords = records.filter(
+  // Due Records Logic (Excluding cancelled records)
+  const overdueRecords = activeRecords.filter(
     (r) =>
       r.dueDate &&
       new Date(r.dueDate) < now &&
@@ -71,9 +72,9 @@ export default function Dashboard() {
       r.depositAmount < 1000 // Only count as "debtor" if paid less than 1000 TL
   );
 
-  // Share type breakdown
+  // Share type breakdown (Excluding cancelled records)
   const shareBreakdown = shareTypes.map((st) => {
-    const typeRecords = records.filter((r) => r.shareTypeId === st.id);
+    const typeRecords = activeRecords.filter((r) => r.shareTypeId === st.id);
     const total = typeRecords.reduce((s, r) => s + (r.totalPrice || 0), 0);
     const collected = typeRecords.reduce((s, r) => s + (r.depositAmount || 0), 0);
     return {
@@ -87,8 +88,8 @@ export default function Dashboard() {
 
   const pieData = shareBreakdown.filter((s) => s.count > 0);
 
-  // Custom logic for "Büyükbaş" target tracking
-  const buyukbasRecords = records.filter(r => r.shareTypeName?.toLowerCase().includes('büyükbaş'));
+  // Custom logic for "Büyükbaş" target tracking (Excluding cancelled records)
+  const buyukbasRecords = activeRecords.filter(r => r.shareTypeName?.toLowerCase().includes('büyükbaş'));
   const buyukbasCount = buyukbasRecords.length;
 
   const targetCount = settings?.targetCount || 100;

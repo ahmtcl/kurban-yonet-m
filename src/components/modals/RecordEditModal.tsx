@@ -183,11 +183,16 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
         if (!confirm('Bu kaydı iptal etmek istediğinize emin misiniz?')) return;
         setSaving(true);
         try {
-            await updateRecord(record!.id, { status: 'cancelled' });
-            if (record?.groupId) {
+            // Normal users' cancellation requests go to 'pending_cancellation'
+            // Admins can trigger this too if they want to use the explicit 'İptal Et' button
+            const targetStatus = isAdmin ? 'cancelled' : 'pending_cancellation';
+            await updateRecord(record!.id, { status: targetStatus });
+
+            if (targetStatus === 'cancelled' && record?.groupId) {
                 await removeMemberFromGroup(record.groupId, record.id);
             }
-            alert('Kayıt iptal edildi.');
+
+            alert(isAdmin ? 'Kayıt iptal edildi.' : 'İptal talebiniz alındı (Onay bekleniyor).');
             onSave();
             onClose();
         } catch (error) {
@@ -238,6 +243,8 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
                             >
                                 <option value="waiting_approval">⏳ Ödeme Onayı Bekleniyor</option>
                                 <option value="approved">✅ Ödeme Onaylandı</option>
+                                <option value="pending_cancellation">⏳ İptal Bekliyor</option>
+                                <option value="cancelled">❌ İptal Edildi</option>
                             </select>
                         )}
                         {isAdmin && <span className="badge badge-warning" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><FiShield /> Admin</span>}

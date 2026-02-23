@@ -44,7 +44,7 @@ export interface Record {
     notes: string;
     smsVerified: boolean;
     orderNumber?: number;
-    status: 'waiting_approval' | 'approved' | 'cancelled'; // Added status
+    status: 'waiting_approval' | 'approved' | 'cancelled' | 'pending_cancellation'; // Added status
     createdAt: Date;
     updatedAt?: Date; // Added updatedAt
     createdBy: string; // Full name of creator

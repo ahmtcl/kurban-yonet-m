@@ -79,17 +79,18 @@ export default function RaporlarPage() {
             doc.setFontSize(12);
             doc.text(`Tarih: ${new Date().toLocaleDateString('tr-TR')}`, 14, 30);
 
-            // Summary
-            const totalAmount = records.reduce((s, r) => s + (r.totalPrice || 0), 0);
-            const totalPaid = records.reduce((s, r) => s + (r.depositAmount || 0), 0);
+            // Summary (Excluding cancelled records)
+            const activeRecords = records.filter(r => r.status !== 'cancelled');
+            const totalAmount = activeRecords.reduce((s, r) => s + (r.totalPrice || 0), 0);
+            const totalPaid = activeRecords.reduce((s, r) => s + (r.depositAmount || 0), 0);
 
-            doc.text(`Toplam Hissedar: ${records.length}`, 14, 40);
+            doc.text(`Toplam Hissedar: ${activeRecords.length}`, 14, 40);
             doc.text(`Toplam Tutar: ${totalAmount.toLocaleString('tr-TR')} TL`, 14, 46);
             doc.text(`Toplanan: ${totalPaid.toLocaleString('tr-TR')} TL`, 14, 52);
             doc.text(`Kalan: ${(totalAmount - totalPaid).toLocaleString('tr-TR')} TL`, 14, 58);
 
-            // Table
-            const tableData = records.map((r, i) => [
+            // Table (Using filtered activeRecords)
+            const tableData = activeRecords.map((r, i) => [
                 (i + 1).toString(),
                 r.ownerName,
                 r.shareTypeName || '-',
@@ -146,8 +147,8 @@ export default function RaporlarPage() {
                     <div className="card-header"><h3>Genel Durum</h3></div>
                     <div className="stats-grid">
                         <div className="stat-card">
-                            <div className="stat-value">{records.length}</div>
-                            <div className="stat-label">Kayıt</div>
+                            <div className="stat-value">{records.filter(r => r.status !== 'cancelled').length}</div>
+                            <div className="stat-label">Aktif Kayıt</div>
                         </div>
                         <div className="stat-card">
                             <div className="stat-value">{shareTypes.length}</div>

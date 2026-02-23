@@ -58,7 +58,8 @@ export default function KayitlarPage() {
             const matchPayment = !filterPayment || r.paymentType === filterPayment;
             const matchGroup = !filterGroup || r.groupId === filterGroup;
             const matchDay = !filterDay || r.daySelection?.toString() === filterDay;
-            const isNotCancelled = r.status !== 'cancelled'; // Hide cancelled records from main view
+            // Hide cancelled records if explicitly filtered (optional), otherwise show them
+            const isNotCancelled = true; // Included all by default now, will be sorted to bottom
 
             let matchDate = true;
             if (startDate || endDate) {
@@ -91,13 +92,21 @@ export default function KayitlarPage() {
             return matchSearch && matchShare && matchPayment && matchGroup && matchDay && matchDate && isNotCancelled;
         });
 
-        // Default sort: waiting_approval first, then by createdAt desc
+        // Default sort logic
         return result.sort((a, b) => {
-            // Prioritize waiting_approval
+            // 1. Prioritize pending cancellation requests
+            if (a.status === 'pending_cancellation' && b.status !== 'pending_cancellation') return -1;
+            if (a.status !== 'pending_cancellation' && b.status === 'pending_cancellation') return 1;
+
+            // 2. Deprioritize cancelled records (they go to the very bottom)
+            if (a.status === 'cancelled' && b.status !== 'cancelled') return 1;
+            if (a.status !== 'cancelled' && b.status === 'cancelled') return -1;
+
+            // 3. Prioritize waiting_approval (original behavior)
             if (a.status === 'waiting_approval' && b.status !== 'waiting_approval') return -1;
             if (a.status !== 'waiting_approval' && b.status === 'waiting_approval') return 1;
 
-            // Secondary: newest first
+            // 4. Secondary: newest first
             return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
     }, [records, search, filterShareType, filterPayment, filterGroup, filterDay, startDate, endDate, dateFilterType]);
@@ -444,6 +453,8 @@ export default function KayitlarPage() {
                                                 <span className="badge badge-success" style={{ fontSize: 11 }}>Onaylandı</span>
                                             ) : r.status === 'cancelled' ? (
                                                 <span className="badge badge-danger" style={{ fontSize: 11 }}>İptal Edildi</span>
+                                            ) : r.status === 'pending_cancellation' ? (
+                                                <span className="badge badge-warning" style={{ fontSize: 11 }}>🎁 İptal Bekliyor</span>
                                             ) : (
                                                 <span className="badge badge-warning" style={{ fontSize: 11 }}>Bekliyor</span>
                                             )}
