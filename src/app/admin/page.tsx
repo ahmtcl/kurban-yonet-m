@@ -157,9 +157,11 @@ export default function AdminPage() {
             (r.orderNumber && r.orderNumber.toString().includes(searchQuery))
         )
         .sort((a, b) => {
-            // 1. Prioritize status 'waiting_approval'
-            if (a.status === 'waiting_approval' && b.status !== 'waiting_approval') return -1;
-            if (a.status !== 'waiting_approval' && b.status === 'waiting_approval') return 1;
+            // 1. Prioritize pending cancellation requests and payment approvals
+            const priorityA = a.status === 'pending_cancellation' ? 2 : (a.status === 'waiting_approval' ? 1 : 0);
+            const priorityB = b.status === 'pending_cancellation' ? 2 : (b.status === 'waiting_approval' ? 1 : 0);
+
+            if (priorityA !== priorityB) return priorityB - priorityA;
 
             // 2. Then sort by orderNumber desc (newest first)
             const orderA = a.orderNumber || 0;
@@ -268,6 +270,10 @@ export default function AdminPage() {
                                                         <td>
                                                             {r.status === 'approved' ? (
                                                                 <span className="badge badge-success" style={{ fontSize: 11 }}>Onaylandı</span>
+                                                            ) : r.status === 'pending_cancellation' ? (
+                                                                <span className="badge badge-warning" style={{ fontSize: 11 }}>⏳ İptal Bekliyor</span>
+                                                            ) : r.status === 'cancelled' ? (
+                                                                <span className="badge badge-danger" style={{ fontSize: 11 }}>İptal Edildi</span>
                                                             ) : (
                                                                 <span className="badge badge-warning" style={{ fontSize: 11 }}>Bekliyor</span>
                                                             )}
