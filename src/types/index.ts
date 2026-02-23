@@ -44,7 +44,7 @@ export interface Record {
     notes: string;
     smsVerified: boolean;
     orderNumber?: number;
-    status: 'waiting_approval' | 'approved'; // Added status
+    status: 'waiting_approval' | 'approved' | 'cancelled'; // Added status
     createdAt: Date;
     updatedAt?: Date; // Added updatedAt
     createdBy: string; // Full name of creator
@@ -72,6 +72,10 @@ export interface Settings {
     moveButtonEnabled: boolean;
     lastOrderNumber?: number; // Added for auto-increment
     smsTemplates: SMSTemplate[]; // New dynamic templates
+    // New Record Admin SMS Notification
+    newRecordSmsEnabled: boolean;
+    newRecordSmsNumbers: string; // Comma-separated phone numbers
+    newRecordSmsTemplate: string; // Template with {SIPARIS_NO}, {HISSE_TIPI}, {AD_SOYAD}
 }
 
 export interface DashboardStats {

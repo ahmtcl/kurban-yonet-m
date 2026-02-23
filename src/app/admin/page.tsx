@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 export default function AdminPage() {
     const { user, isAdmin, logout, loading: authLoading } = useAuth();
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState<'settings' | 'shares' | 'collections' | 'users'>('collections');
+    const [activeTab, setActiveTab] = useState<'settings' | 'shares' | 'collections' | 'users' | 'sms'>('collections');
 
     // Data State
     const [settings, setSettings] = useState<Settings | null>(null);
@@ -71,6 +71,7 @@ export default function AdminPage() {
     const [newUserUsername, setNewUserUsername] = useState('');
     const [newUserPassword, setNewUserPassword] = useState('');
     const [newUserRole, setNewUserRole] = useState<UserRole>('employee');
+    const [newSmsNumber, setNewSmsNumber] = useState('');
 
     async function handleAddUser() {
         if (!newUserName || !newUserUsername || !newUserPassword) return;
@@ -149,11 +150,22 @@ export default function AdminPage() {
         }
     }
 
-    const filteredRecords = records.filter(r =>
-        r.ownerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (r.phone && r.phone.includes(searchQuery)) ||
-        (r.orderNumber && r.orderNumber.toString().includes(searchQuery))
-    );
+    const filteredRecords = records
+        .filter(r =>
+            r.ownerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (r.phone && r.phone.includes(searchQuery)) ||
+            (r.orderNumber && r.orderNumber.toString().includes(searchQuery))
+        )
+        .sort((a, b) => {
+            // 1. Prioritize status 'waiting_approval'
+            if (a.status === 'waiting_approval' && b.status !== 'waiting_approval') return -1;
+            if (a.status !== 'waiting_approval' && b.status === 'waiting_approval') return 1;
+
+            // 2. Then sort by orderNumber desc (newest first)
+            const orderA = a.orderNumber || 0;
+            const orderB = b.orderNumber || 0;
+            return orderB - orderA;
+        });
 
     if (isAdmin) {
         return (
@@ -193,6 +205,12 @@ export default function AdminPage() {
                                 onClick={() => setActiveTab('shares')}
                             >
                                 <FiTag /> Hisse Tipleri
+                            </button>
+                            <button
+                                className={`btn ${activeTab === 'sms' ? 'btn-primary' : 'btn-ghost'}`}
+                                onClick={() => setActiveTab('sms')}
+                            >
+                                <FiMessageSquare /> SMS Bildirimi
                             </button>
                         </>
                     )}
@@ -283,7 +301,9 @@ export default function AdminPage() {
                                                         </td>
                                                         <td style={{ fontWeight: 600 }}>{(r.totalPrice || 0).toLocaleString('tr-TR')} ₺</td>
                                                         <td>
-                                                            <div style={{ color: 'var(--accent-success)', fontSize: 13 }}>{r.depositAmount.toLocaleString('tr-TR')} ₺</div>
+                                                            <div style={{ color: r.depositAmount > 0 ? 'var(--accent-success)' : '#94a3b8', fontSize: 13, fontWeight: r.depositAmount > 0 ? 500 : 400 }}>
+                                                                {r.depositAmount > 0 ? `${r.depositAmount.toLocaleString('tr-TR')} ₺` : '—'}
+                                                            </div>
                                                             {kalan > 0 && <div style={{ color: 'var(--accent-danger)', fontSize: 12, fontWeight: 500 }}>Kalan: {kalan.toLocaleString('tr-TR')} ₺</div>}
                                                         </td>
                                                         <td style={{ fontSize: 12, color: '#666' }}>
@@ -450,10 +470,142 @@ export default function AdminPage() {
                                         <FiSave /> {saving ? 'Kaydediliyor...' : 'Şablonları Kaydet'}
                                     </button>
                                 </div>
+
+                            </div>
+
+                        )}
+
+                        {activeTab === 'sms' && isAdmin && settings && (
+                            <div className="card" style={{ maxWidth: 600 }}>
+                                <h3 style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <FiMessageSquare style={{ color: '#10b981' }} /> Yeni Kayıt SMS Bildirimi
+                                </h3>
+                                <p style={{ fontSize: 13, color: '#666', marginBottom: 20 }}>
+                                    Yeni bir kayıt oluşturulduğunda aşağıdaki numaralara otomatik SMS gönderilir.
+                                    <br />
+                                    <span style={{ color: 'var(--accent-primary)', fontWeight: 500 }}>Kullanılabilir değişkenler:</span>{' '}
+                                    <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 3, fontSize: 12 }}>{'{AD_SOYAD}'}</code>{' '}
+                                    <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 3, fontSize: 12 }}>{'{HISSE_TIPI}'}</code>{' '}
+                                    <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 3, fontSize: 12 }}>{'{SIPARIS_NO}'}</code>
+                                </p>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, padding: '12px 16px', background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0' }}>
+                                    <input
+                                        type="checkbox"
+                                        id="new-record-sms-toggle"
+                                        checked={settings.newRecordSmsEnabled ?? false}
+                                        onChange={(e) => setSettings({ ...settings, newRecordSmsEnabled: e.target.checked })}
+                                        style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#10b981' }}
+                                    />
+                                    <label htmlFor="new-record-sms-toggle" style={{ fontSize: 14, cursor: 'pointer', fontWeight: 600, color: '#10b981' }}>
+                                        Yeni kayıt geldiğinde SMS gönder
+                                    </label>
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="form-label">
+                                        Bildirim Alacak Telefon Numaraları
+                                    </label>
+                                    <div style={{ display: 'flex', gap: 10, marginBottom: 15 }}>
+                                        <input
+                                            className="form-input"
+                                            value={newSmsNumber}
+                                            onChange={(e) => setNewSmsNumber(e.target.value.replace(/\D/g, ''))}
+                                            placeholder="Örn: 05551234567"
+                                            disabled={!settings.newRecordSmsEnabled}
+                                            maxLength={11}
+                                        />
+                                        <button
+                                            className="btn btn-primary"
+                                            type="button"
+                                            disabled={!settings.newRecordSmsEnabled || newSmsNumber.length < 10}
+                                            onClick={() => {
+                                                const currentNumbers = settings.newRecordSmsNumbers
+                                                    ? settings.newRecordSmsNumbers.split(',').map(n => n.trim()).filter(n => n)
+                                                    : [];
+                                                if (!currentNumbers.includes(newSmsNumber)) {
+                                                    const updatedNumbers = [...currentNumbers, newSmsNumber].join(', ');
+                                                    setSettings({ ...settings, newRecordSmsNumbers: updatedNumbers });
+                                                    setNewSmsNumber('');
+                                                } else {
+                                                    alert('Bu numara zaten ekli.');
+                                                }
+                                            }}
+                                        >
+                                            <FiPlus /> Ekle
+                                        </button>
+                                    </div>
+
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        {(settings.newRecordSmsNumbers || '').split(',').map(n => n.trim()).filter(n => n).map((number, idx) => (
+                                            <div key={idx} style={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                padding: '8px 12px',
+                                                background: '#f8fafc',
+                                                borderRadius: 6,
+                                                border: '1px solid #e2e8f0'
+                                            }}>
+                                                <span style={{ fontWeight: 500, color: '#334155' }}>{number}</span>
+                                                <button
+                                                    className="btn btn-icon btn-sm btn-ghost"
+                                                    style={{ color: 'var(--accent-danger)' }}
+                                                    onClick={() => {
+                                                        const updatedNumbers = settings.newRecordSmsNumbers
+                                                            .split(',')
+                                                            .map(n => n.trim())
+                                                            .filter(n => n !== number)
+                                                            .join(', ');
+                                                        setSettings({ ...settings, newRecordSmsNumbers: updatedNumbers });
+                                                    }}
+                                                >
+                                                    <FiTrash2 />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        {(!settings.newRecordSmsNumbers || settings.newRecordSmsNumbers.trim() === '') && (
+                                            <div style={{ textAlign: 'center', padding: 15, color: '#94a3b8', fontSize: 13, border: '1px dashed #e2e8f0', borderRadius: 6 }}>
+                                                Henüz numara eklenmemiş.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="form-label">Mesaj Şablonu</label>
+                                    <textarea
+                                        className="form-textarea"
+                                        value={settings.newRecordSmsTemplate ?? ''}
+                                        onChange={(e) => setSettings({ ...settings, newRecordSmsTemplate: e.target.value })}
+                                        placeholder="YENI KAYIT: {AD_SOYAD} - {HISSE_TIPI} - SIPARIS NO: {SIPARIS_NO}"
+                                        rows={4}
+                                        disabled={!settings.newRecordSmsEnabled}
+                                    />
+                                    {settings.newRecordSmsTemplate && (
+                                        <div style={{ fontSize: 12, color: '#666', marginTop: 6, padding: '8px 12px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
+                                            <strong>Önizleme:</strong>{' '}
+                                            {settings.newRecordSmsTemplate
+                                                .replace(/{AD_SOYAD}/g, 'Ahmet Yılmaz')
+                                                .replace(/{HISSE_TIPI}/g, '20-25 KG HİSSE')
+                                                .replace(/{SIPARIS_NO}/g, '59794')}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <button
+                                    className="btn btn-success"
+                                    style={{ width: '100%', marginTop: 10 }}
+                                    onClick={handleSaveSettings}
+                                    disabled={saving}
+                                >
+                                    <FiSave /> {saving ? 'Kaydediliyor...' : 'Bildirim Ayarlarını Kaydet'}
+                                </button>
                             </div>
                         )}
 
                         {activeTab === 'shares' && isAdmin && (
+
                             <div className="card">
                                 <h3 style={{ marginBottom: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
                                     <FiPlus /> Yeni Hisse Tipi Ekle

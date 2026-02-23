@@ -58,6 +58,7 @@ export default function KayitlarPage() {
             const matchPayment = !filterPayment || r.paymentType === filterPayment;
             const matchGroup = !filterGroup || r.groupId === filterGroup;
             const matchDay = !filterDay || r.daySelection?.toString() === filterDay;
+            const isNotCancelled = r.status !== 'cancelled'; // Hide cancelled records from main view
 
             let matchDate = true;
             if (startDate || endDate) {
@@ -87,7 +88,7 @@ export default function KayitlarPage() {
                 }
             }
 
-            return matchSearch && matchShare && matchPayment && matchGroup && matchDay && matchDate;
+            return matchSearch && matchShare && matchPayment && matchGroup && matchDay && matchDate && isNotCancelled;
         });
 
         // Default sort: waiting_approval first, then by createdAt desc
@@ -441,6 +442,8 @@ export default function KayitlarPage() {
                                         <td>
                                             {r.status === 'approved' ? (
                                                 <span className="badge badge-success" style={{ fontSize: 11 }}>Onaylandı</span>
+                                            ) : r.status === 'cancelled' ? (
+                                                <span className="badge badge-danger" style={{ fontSize: 11 }}>İptal Edildi</span>
                                             ) : (
                                                 <span className="badge badge-warning" style={{ fontSize: 11 }}>Bekliyor</span>
                                             )}
@@ -476,7 +479,9 @@ export default function KayitlarPage() {
                                         </td>
                                         <td style={{ fontWeight: 600 }}>{(r.totalPrice || 0).toLocaleString('tr-TR')} ₺</td>
                                         <td>
-                                            <div style={{ color: 'var(--accent-success)', fontSize: 13 }}>{r.depositAmount.toLocaleString('tr-TR')} ₺</div>
+                                            <div style={{ color: r.depositAmount > 0 ? 'var(--accent-success)' : '#94a3b8', fontSize: 13, fontWeight: r.depositAmount > 0 ? 500 : 400 }}>
+                                                {r.depositAmount > 0 ? `${r.depositAmount.toLocaleString('tr-TR')} ₺` : '—'}
+                                            </div>
                                             {kalan > 0 && <div style={{ color: 'var(--accent-danger)', fontSize: 12, fontWeight: 500 }}>Kalan: {kalan.toLocaleString('tr-TR')} ₺</div>}
                                         </td>
                                         <td style={{ fontSize: 12, color: '#666' }}>
@@ -502,14 +507,6 @@ export default function KayitlarPage() {
                                                     title="Düzenle"
                                                 >
                                                     <FiEdit />
-                                                </button>
-                                                <button
-                                                    className="btn btn-icon btn-sm btn-ghost"
-                                                    style={{ color: 'var(--accent-danger)' }}
-                                                    onClick={() => setDeleteConfirm(r.id)}
-                                                    title="Sil"
-                                                >
-                                                    <FiTrash2 />
                                                 </button>
                                             </div>
                                         </td>

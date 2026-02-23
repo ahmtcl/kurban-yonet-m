@@ -189,6 +189,25 @@ export default function YeniKayit() {
                 await sendSMS(phone, confirmMessage);
             }
 
+            // 4. Send Admin Notification SMS if enabled in settings
+            if (settings?.newRecordSmsEnabled && settings.newRecordSmsNumbers?.trim()) {
+                const rawTemplate = settings.newRecordSmsTemplate || 'YENI KAYIT: {AD_SOYAD} - {HISSE_TIPI} - SIPARIS NO: {SIPARIS_NO}';
+                const adminMessage = rawTemplate
+                    .replace(/{AD_SOYAD}/g, ownerName.trim())
+                    .replace(/{HISSE_TIPI}/g, selectedShareType?.name || '')
+                    .replace(/{SIPARIS_NO}/g, String(orderNo));
+
+                const targetNumbers = settings.newRecordSmsNumbers
+                    .split(',')
+                    .map((n) => n.trim().replace(/\D/g, ''))
+                    .filter((n) => n.length >= 10);
+
+                for (const number of targetNumbers) {
+                    const formattedNumber = number.startsWith('0') ? number : '0' + number;
+                    await sendSMS(formattedNumber, adminMessage);
+                }
+            }
+
             showToast('success', 'Kayıt başarıyla oluşturuldu ve onay SMS\'i gönderildi!');
 
             // Reset form

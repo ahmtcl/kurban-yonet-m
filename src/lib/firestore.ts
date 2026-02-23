@@ -272,6 +272,9 @@ export async function getSettings(): Promise<Settings> {
                 { id: '2', label: 'Grup Bilgisi', text: 'SAYIN {AD_SOYAD}, KURBAN GRUBUNUZ OLUSTURULMUSTUR. SIPARIS NO: {SIPARIS_NO}.' },
                 { id: '3', label: 'Kesim Günü', text: 'SAYIN {AD_SOYAD}, KURBANINIZ {KESIM_GUNU}. GUN KESILECEKTIR.' },
             ],
+            newRecordSmsEnabled: false,
+            newRecordSmsNumbers: '',
+            newRecordSmsTemplate: 'YENI KAYIT: {AD_SOYAD} - {HISSE_TIPI} - SIPARIS NO: {SIPARIS_NO}',
         };
         await setDoc(doc(db, 'settings', 'general'), defaults);
         return defaults;

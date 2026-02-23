@@ -18,6 +18,7 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
     const [editRecord, setEditRecord] = useState<RecordType | null>(null);
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [settings, setSettings] = useState<Settings | null>(null);
     const [shareTypes, setShareTypes] = useState<ShareType[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
@@ -28,6 +29,7 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
     const [sendSmsToggle, setSendSmsToggle] = useState(true); // New toggle state
     const [serverOtp, setServerOtp] = useState('');
     const [userOtp, setUserOtp] = useState('');
+    const [depositInput, setDepositInput] = useState('');
 
     // Custom SMS State
     const [customMessage, setCustomMessage] = useState('');
@@ -51,6 +53,7 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
         getShareTypes().then(setShareTypes).catch(console.error);
         getGroups().then(setGroups).catch(console.error);
         setSelectedGroupId(record?.groupId || '');
+        setDepositInput(record?.depositAmount ? record.depositAmount.toString() : '');
     }, [record]);
 
     if (!editRecord || !record) return null;
@@ -161,18 +164,37 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
 
     async function handleDelete() {
         if (!isAdmin) return;
-        if (!confirm('Bu kaydı silmek istediğinize emin misiniz? Bu işlem geri alınamaz!')) return;
 
         setDeleting(true);
         try {
             await deleteRecord(editRecord!.id);
             onSave(); // Refresh list
             onClose();
+            setShowDeleteConfirm(false);
         } catch (error) {
             console.error('Silme hatası:', error);
             alert('Silme işlemi başarısız.');
         } finally {
             setDeleting(false);
+        }
+    }
+
+    async function handleCancelRecord() {
+        if (!confirm('Bu kaydı iptal etmek istediğinize emin misiniz?')) return;
+        setSaving(true);
+        try {
+            await updateRecord(record!.id, { status: 'cancelled' });
+            if (record?.groupId) {
+                await removeMemberFromGroup(record.groupId, record.id);
+            }
+            alert('Kayıt iptal edildi.');
+            onSave();
+            onClose();
+        } catch (error) {
+            console.error('İptal hatası:', error);
+            alert('İptal işlemi başarısız.');
+        } finally {
+            setSaving(false);
         }
     }
 
@@ -296,9 +318,18 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
                                 <label className="form-label">Ödenen Tutar</label>
                                 <input
                                     className="form-input"
-                                    type="number"
-                                    value={editRecord.depositAmount}
-                                    onChange={(e) => setEditRecord({ ...editRecord, depositAmount: parseFloat(e.target.value) || 0 })}
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={depositInput}
+                                    onChange={(e) => {
+                                        const val = e.target.value.replace(',', '.');
+                                        if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                                            setDepositInput(val);
+                                            setEditRecord({ ...editRecord, depositAmount: parseFloat(val) || 0 });
+                                        }
+                                    }}
+                                    onFocus={(e) => e.target.select()}
+                                    placeholder="0"
                                 />
                             </div>
                         </div>
@@ -432,14 +463,23 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
                                 >
                                     <FiDownload /> Makbuz Al
                                 </button>
-                                {isAdmin && (
+                                {isAdmin ? (
                                     <button
                                         className="btn btn-danger"
-                                        onClick={handleDelete}
+                                        onClick={() => setShowDeleteConfirm(true)}
                                         disabled={deleting || saving}
                                         style={{ display: 'flex', alignItems: 'center', gap: 5 }}
                                     >
                                         <FiTrash2 /> Sil
+                                    </button>
+                                ) : (
+                                    <button
+                                        className="btn btn-danger"
+                                        onClick={handleCancelRecord}
+                                        disabled={saving}
+                                        style={{ display: 'flex', alignItems: 'center', gap: 5 }}
+                                    >
+                                        <FiX /> Kaydı İptal Et
                                     </button>
                                 )}
                             </div>
@@ -484,6 +524,29 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
                             <button className="btn btn-primary" onClick={verifyAndSave} disabled={saving || userOtp.length !== 6}>
                                 Onayla ve Kaydet
                             </button>
+                        </div>
+                    </div>
+                )}
+
+                {showDeleteConfirm && (
+                    <div className="modal-backdrop" style={{ zIndex: 2000 }}>
+                        <div className="modal" style={{ maxWidth: 400, textAlign: 'center', padding: '30px 20px' }} onClick={(e) => e.stopPropagation()}>
+                            <div style={{ fontSize: 40, color: 'var(--accent-danger)', marginBottom: 15 }}>
+                                <FiTrash2 />
+                            </div>
+                            <h4 style={{ marginBottom: 10 }}>Kayıt Silinsin mi?</h4>
+                            <p style={{ color: '#666', marginBottom: 25, fontSize: 14 }}>
+                                Bu kaydı silmek istediğinize emin misiniz?<br />
+                                <strong>Bu işlem geri alınamaz!</strong>
+                            </p>
+                            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+                                <button className="btn btn-ghost" onClick={() => setShowDeleteConfirm(false)} disabled={deleting}>
+                                    Vazgeç
+                                </button>
+                                <button className="btn btn-danger" onClick={handleDelete} disabled={deleting}>
+                                    {deleting ? 'Siliniyor...' : 'Evet, Sil'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
