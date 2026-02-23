@@ -15,7 +15,7 @@ import {
     runTransaction, // Added runTransaction
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { ShareType, Record, Group, Settings, PaymentType, User } from '@/types';
+import type { ShareType, Record, Group, Settings, PaymentType, User, AppNotification } from '@/types';
 
 // ===== SHARE TYPES =====
 export async function getShareTypes(): Promise<ShareType[]> {
@@ -319,4 +319,34 @@ export async function getUserByUsername(username: string): Promise<User | null> 
     if (snap.empty) return null;
     const doc = snap.docs[0];
     return { id: doc.id, ...doc.data(), createdAt: doc.data().createdAt?.toDate?.() || new Date() } as User;
+}
+
+// ===== NOTIFICATIONS =====
+export async function getNotifications(): Promise<AppNotification[]> {
+    const q = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+        createdAt: d.data().createdAt?.toDate?.() || new Date(),
+    } as AppNotification));
+}
+
+export async function addNotification(data: Omit<AppNotification, 'id' | 'createdAt' | 'isRead'>) {
+    return addDoc(collection(db, 'notifications'), {
+        ...data,
+        isRead: false,
+        createdAt: serverTimestamp(),
+    });
+}
+
+export async function markNotificationAsRead(id: string) {
+    return updateDoc(doc(db, 'notifications', id), { isRead: true });
+}
+
+export async function clearNotifications() {
+    const q = query(collection(db, 'notifications'), where('isRead', '==', true));
+    const snapshot = await getDocs(q);
+    const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
+    return Promise.all(deletePromises);
 }

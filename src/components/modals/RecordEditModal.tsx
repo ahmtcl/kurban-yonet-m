@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { updateRecord, deleteRecord, getSettings, getShareTypes, getGroups, addMemberToGroup, removeMemberFromGroup } from '@/lib/firestore'; // Added group utils
+import { updateRecord, deleteRecord, getSettings, getShareTypes, getGroups, addMemberToGroup, removeMemberFromGroup, addNotification } from '@/lib/firestore'; // Added group utils
 import type { Record as RecordType, PaymentType, Settings, ShareType, Group } from '@/types';
 import { generateReceipt } from '@/utils/pdfGenerator';
 import { useAuth } from '@/context/AuthContext';
@@ -187,6 +187,15 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
             // Admins can trigger this too if they want to use the explicit 'İptal Et' button
             const targetStatus = isAdmin ? 'cancelled' : 'pending_cancellation';
             await updateRecord(record!.id, { status: targetStatus });
+
+            if (targetStatus === 'pending_cancellation') {
+                await addNotification({
+                    type: 'cancellation_request',
+                    title: 'İptal Talebi',
+                    message: `${record!.ownerName} (#${record!.orderNumber}) için iptal talebi oluşturuldu.`,
+                    recordId: record!.id
+                });
+            }
 
             if (targetStatus === 'cancelled' && record?.groupId) {
                 await removeMemberFromGroup(record.groupId, record.id);

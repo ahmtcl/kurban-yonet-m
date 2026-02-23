@@ -93,3 +93,13 @@ export interface DashboardStats {
     overdueRecords: number;
     pendingRecords: number;
 }
+
+export interface AppNotification {
+    id: string;
+    type: 'cancellation_request' | 'system' | 'info';
+    title: string;
+    message: string;
+    recordId?: string;
+    isRead: boolean;
+    createdAt: Date;
+}
