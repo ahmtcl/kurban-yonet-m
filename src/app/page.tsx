@@ -64,6 +64,8 @@ export default function Dashboard() {
   const now = new Date();
 
   // Due Records Logic (Excluding cancelled records)
+  const pendingCancellationRecords = activeRecords.filter(r => r.status === 'pending_cancellation');
+
   const overdueRecords = activeRecords.filter(
     (r) =>
       r.dueDate &&
@@ -176,6 +178,20 @@ export default function Dashboard() {
             <div className="stat-icon"><FiClock /></div>
             <div className="stat-value">{totalRemaining.toLocaleString('tr-TR')} ₺</div>
             <div className="stat-label">Kalan Tutar</div>
+          </div>
+
+          {/* İptal Bekleyenler Card */}
+          <div
+            className="stat-card warning"
+            style={{ cursor: 'pointer', transition: 'transform 0.2s', border: '1px solid #fbbf24', background: '#fffbeb' }}
+            onClick={() => router.push('/kayitlar?search=İptal Bekliyor')}
+            onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+            onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            <div className="stat-icon"><FiAlertTriangle /></div>
+            <div className="stat-value" style={{ color: '#d97706' }}>{pendingCancellationRecords.length}</div>
+            <div className="stat-label" style={{ color: '#92400e', fontWeight: 600 }}>İptal Bekleyenler</div>
+            <div style={{ fontSize: 11, color: '#b45309', marginTop: 4 }}>Talepleri incele →</div>
           </div>
 
           {/* Vadesi Gelenler Widget - Clickable */}

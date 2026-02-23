@@ -245,17 +245,53 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
                         <h3>Kayıt Düzenle</h3>
                         {editRecord.orderNumber && <span className="badge badge-primary">#{editRecord.orderNumber}</span>}
                         {isAdmin && (
-                            <select
-                                className="form-select"
-                                style={{ width: 'auto', padding: '2px 8px', fontSize: '12px', height: '28px' }}
-                                value={editRecord.status || 'waiting_approval'}
-                                onChange={(e) => setEditRecord({ ...editRecord, status: e.target.value as any })}
-                            >
-                                <option value="waiting_approval">⏳ Ödeme Onayı Bekleniyor</option>
-                                <option value="approved">✅ Ödeme Onaylandı</option>
-                                <option value="pending_cancellation">⏳ İptal Bekliyor</option>
-                                <option value="cancelled">❌ İptal Edildi</option>
-                            </select>
+                            <div className="d-flex align-items-center gap-2">
+                                <select
+                                    className="form-select"
+                                    style={{ width: 'auto', padding: '2px 8px', fontSize: '12px', height: '28px' }}
+                                    value={editRecord.status || 'waiting_approval'}
+                                    onChange={(e) => setEditRecord({ ...editRecord, status: e.target.value as any })}
+                                >
+                                    <option value="waiting_approval">⏳ Ödeme Onayı Bekleniyor</option>
+                                    <option value="approved">✅ Ödeme Onaylandı</option>
+                                    <option value="pending_cancellation">⏳ İptal Bekliyor</option>
+                                    <option value="cancelled">❌ İptal Edildi</option>
+                                </select>
+
+                                {record?.status === 'pending_cancellation' && (
+                                    <button
+                                        type="button"
+                                        className="btn btn-sm btn-success"
+                                        onClick={async () => {
+                                            if (!confirm('İptal talebini reddedip kaydı onaylı duruma getirmek istiyor musunuz?')) return;
+                                            setSaving(true);
+                                            try {
+                                                await updateRecord(record!.id, { status: 'approved' });
+                                                alert('İptal talebi reddedildi, kayıt onaylı duruma getirildi.');
+                                                onSave();
+                                                onClose();
+                                            } catch (err) {
+                                                console.error(err);
+                                                alert('İşlem başarısız.');
+                                            } finally {
+                                                setSaving(false);
+                                            }
+                                        }}
+                                        disabled={saving}
+                                    >
+                                        ↩️ Talebi Reddet
+                                    </button>
+                                )}
+
+                                <button
+                                    type="button"
+                                    className="btn btn-sm btn-danger"
+                                    onClick={handleCancelRecord}
+                                    disabled={saving}
+                                >
+                                    {record?.status === 'pending_cancellation' ? '❌ İptali Onayla' : 'İptal Et'}
+                                </button>
+                            </div>
                         )}
                         {isAdmin && <span className="badge badge-warning" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><FiShield /> Admin</span>}
                     </div>

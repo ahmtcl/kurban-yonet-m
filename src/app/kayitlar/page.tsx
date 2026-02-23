@@ -3,15 +3,17 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { FiSearch, FiEdit, FiTrash2, FiDownload, FiRefreshCw } from 'react-icons/fi';
-import { getRecords, getShareTypes, deleteRecord, getGroups } from '@/lib/firestore';
+import { getRecords, getShareTypes, deleteRecord, getGroups, updateRecord } from '@/lib/firestore';
 import type { Record as RecordType, ShareType, Group } from '@/types';
 import RecordEditModal from '@/components/modals/RecordEditModal';
+import { useAuth } from '@/context/AuthContext';
 
 export default function KayitlarPage() {
     const [records, setRecords] = useState<RecordType[]>([]);
     const [shareTypes, setShareTypes] = useState<ShareType[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
     const [loading, setLoading] = useState(true);
+    const { isAdmin } = useAuth();
 
     // Filters
     const [search, setSearch] = useState('');
@@ -63,7 +65,8 @@ export default function KayitlarPage() {
                 r.ownerName.toLowerCase().includes(search.toLowerCase()) ||
                 r.phone.includes(search) ||
                 (r.orderNumber && r.orderNumber.toString().includes(search)) ||
-                r.notes?.toLowerCase().includes(search.toLowerCase());
+                r.notes?.toLowerCase().includes(search.toLowerCase()) ||
+                (search.toLowerCase() === 'iptal bekliyor' && r.status === 'pending_cancellation');
             const matchShare = !filterShareType || r.shareTypeId === filterShareType;
             const matchPayment = !filterPayment || r.paymentType === filterPayment;
             const matchGroup = !filterGroup || r.groupId === filterGroup;
@@ -464,7 +467,7 @@ export default function KayitlarPage() {
                                             ) : r.status === 'cancelled' ? (
                                                 <span className="badge badge-danger" style={{ fontSize: 11 }}>İptal Edildi</span>
                                             ) : r.status === 'pending_cancellation' ? (
-                                                <span className="badge badge-warning" style={{ fontSize: 11 }}>🎁 İptal Bekliyor</span>
+                                                <span className="badge badge-warning" style={{ fontSize: 11 }}>⏳ İptal Bekliyor</span>
                                             ) : (
                                                 <span className="badge badge-warning" style={{ fontSize: 11 }}>Bekliyor</span>
                                             )}
@@ -522,6 +525,25 @@ export default function KayitlarPage() {
                                         </td>
                                         <td>
                                             <div style={{ display: 'flex', gap: 4 }}>
+                                                {isAdmin && r.status === 'pending_cancellation' && (
+                                                    <button
+                                                        className="btn btn-icon btn-sm btn-success"
+                                                        onClick={async () => {
+                                                            if (!confirm('İptal talebini reddetmek istiyor musunuz?')) return;
+                                                            try {
+                                                                await updateRecord(r.id, { status: 'approved' });
+                                                                showToast('success', 'İptal talebi reddedildi.');
+                                                                loadData();
+                                                            } catch (err) {
+                                                                console.error(err);
+                                                                showToast('error', 'İşlem başarısız.');
+                                                            }
+                                                        }}
+                                                        title="İptal Talebini Geri Çek"
+                                                    >
+                                                        ↩️
+                                                    </button>
+                                                )}
                                                 <button
                                                     className="btn btn-icon btn-sm btn-ghost"
                                                     onClick={() => setEditRecord({ ...r })}
