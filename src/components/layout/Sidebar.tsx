@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
     FiHome,
     FiPlusCircle,
@@ -38,6 +38,7 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     const pathname = usePathname();
+    const router = useRouter();
     const { isAdmin, user, logout } = useAuth();
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [showNotifications, setShowNotifications] = useState(false);
@@ -65,6 +66,17 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     async function handleMarkRead(id: string) {
         await markNotificationAsRead(id);
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    }
+
+    async function handleNotificationClick(n: AppNotification) {
+        await handleMarkRead(n.id);
+        setShowNotifications(false);
+        if (n.orderNumber) {
+            router.push(`/kayitlar?search=${n.orderNumber}`);
+        } else {
+            router.push('/kayitlar');
+        }
+        if (onClose) onClose();
     }
 
     if (!user) return null;
@@ -138,14 +150,16 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                                         notifications.map(n => (
                                             <div
                                                 key={n.id}
+                                                className="notification-item"
                                                 style={{
                                                     padding: '10px 15px',
                                                     borderBottom: '1px solid #f5f5f5',
                                                     backgroundColor: n.isRead ? 'transparent' : '#fff9eb',
                                                     fontSize: 12,
-                                                    cursor: 'pointer'
+                                                    cursor: 'pointer',
+                                                    transition: 'background-color 0.2s'
                                                 }}
-                                                onClick={() => handleMarkRead(n.id)}
+                                                onClick={() => handleNotificationClick(n)}
                                             >
                                                 <div style={{ fontWeight: n.isRead ? 500 : 700, color: '#333' }}>{n.title}</div>
                                                 <div style={{ color: '#666', marginTop: 2 }}>{n.message}</div>

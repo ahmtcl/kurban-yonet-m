@@ -193,7 +193,8 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
                     type: 'cancellation_request',
                     title: 'İptal Talebi',
                     message: `${record!.ownerName} (#${record!.orderNumber}) için iptal talebi oluşturuldu.`,
-                    recordId: record!.id
+                    recordId: record!.id,
+                    orderNumber: record!.orderNumber
                 });
             }
 

@@ -100,6 +100,7 @@ export interface AppNotification {
     title: string;
     message: string;
     recordId?: string;
+    orderNumber?: number;
     isRead: boolean;
     createdAt: Date;
 }

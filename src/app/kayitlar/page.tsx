@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { FiSearch, FiEdit, FiTrash2, FiDownload, FiRefreshCw } from 'react-icons/fi';
 import { getRecords, getShareTypes, deleteRecord, getGroups } from '@/lib/firestore';
 import type { Record as RecordType, ShareType, Group } from '@/types';
@@ -28,7 +29,16 @@ export default function KayitlarPage() {
     // Edit modal
     const [editRecord, setEditRecord] = useState<RecordType | null>(null);
 
+    const searchParams = useSearchParams();
+
     useEffect(() => { loadData(); }, []);
+
+    useEffect(() => {
+        const initialSearch = searchParams.get('search');
+        if (initialSearch) {
+            setSearch(initialSearch);
+        }
+    }, [searchParams]);
 
     async function loadData(showFeedback = false) {
         setLoading(true);

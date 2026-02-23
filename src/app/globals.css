@@ -922,3 +922,11 @@ tr:last-child td {
     display: none;
   }
 }
+
+.notification-item {
+  transition: background-color 0.2s;
+}
+
+.notification-item:hover {
+  background-color: #f0f0f0 !important;
+}
