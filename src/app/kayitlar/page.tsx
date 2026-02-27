@@ -246,17 +246,58 @@ export default function KayitlarPage() {
         }
     }
 
-    function exportExcel() {
-        import('xlsx').then((XLSX) => {
-            // Prepare Data
-            const title = [`KURBAN HİSSEDARLARI LİSTESİ - ${new Date().toLocaleDateString('tr-TR')}`];
-            const headers = ['Sıra', 'Sipariş No', 'Sipariş Tarihi', 'Ad Soyad', 'Telefon', 'Yedek Tel', 'Hisse', 'Grup', 'Gün', 'Toplam', 'Ödenen', 'Kalan', 'Ödeme Türü', 'Vade', 'Açıklama'];
+    async function exportExcel() {
+        try {
+            const ExcelJS = (await import('exceljs')).default;
+            const saveAs = (await import('file-saver')).saveAs;
 
-            const dataRows = filteredAndSorted.map((r, i) => {
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('Kayıtlar');
+
+            // Title
+            const titleRow = worksheet.addRow([`KURBAN HİSSEDARLARI LİSTESİ - ${new Date().toLocaleDateString('tr-TR')}`]);
+            titleRow.font = { name: 'Arial', family: 4, size: 16, bold: true };
+            worksheet.mergeCells('A1:P1');
+            titleRow.alignment = { vertical: 'middle', horizontal: 'center' };
+            worksheet.addRow([]); // Empty row
+
+            // Headers
+            const headers = ['Sıra', 'Durum', 'Sipariş No', 'Sipariş Tarihi', 'Ad Soyad', 'Telefon', 'Yedek Tel', 'Hisse', 'Grup', 'Gün', 'Toplam', 'Ödenen', 'Kalan', 'Ödeme Türü', 'Vade', 'Açıklama'];
+            const headerRow = worksheet.addRow(headers);
+
+            // Header Style
+            headerRow.eachCell((cell) => {
+                cell.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FF1E293B' } // Slate 800
+                };
+                cell.font = {
+                    name: 'Arial',
+                    color: { argb: 'FFFFFFFF' },
+                    bold: true,
+                    size: 11
+                };
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                cell.border = {
+                    top: { style: 'thin' },
+                    left: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+            });
+
+            // Data Rows
+            filteredAndSorted.forEach((r, i) => {
                 const group = groups.find(g => g.id === r.groupId);
                 const kalan = (r.totalPrice || 0) - r.depositAmount;
-                return [
+                const statusText = r.status === 'approved' ? 'Onaylandı' :
+                    r.status === 'cancelled' ? 'İptal Edildi' :
+                        r.status === 'pending_cancellation' ? 'İptal Bekliyor' : 'Bekliyor';
+
+                const rowValue = [
                     i + 1,
+                    statusText,
                     r.orderNumber || '',
                     new Date(r.createdAt).toLocaleDateString('tr-TR'),
                     r.ownerName,
@@ -272,54 +313,99 @@ export default function KayitlarPage() {
                     r.dueDate ? new Date(r.dueDate).toLocaleDateString('tr-TR') : '',
                     r.notes || ''
                 ];
+
+                const row = worksheet.addRow(rowValue);
+
+                // Row Style
+                row.eachCell((cell, colNumber) => {
+                    cell.alignment = { vertical: 'middle', horizontal: colNumber === 5 || colNumber === 16 ? 'left' : 'center' };
+                    cell.border = {
+                        top: { style: 'thin' },
+                        left: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        right: { style: 'thin' }
+                    };
+
+                    // Zebra striping
+                    if (i % 2 === 0) {
+                        cell.fill = {
+                            type: 'pattern',
+                            pattern: 'solid',
+                            fgColor: { argb: 'FFF8FAFC' }
+                        };
+                    }
+
+                    // Status coloring
+                    if (colNumber === 2) {
+                        if (r.status === 'approved') cell.font = { color: { argb: 'FF15803D' }, bold: true };
+                        if (r.status === 'cancelled') cell.font = { color: { argb: 'FFB91C1C' }, bold: true };
+                        if (r.status === 'pending_cancellation') cell.font = { color: { argb: 'FFB45309' }, bold: true };
+                    }
+
+                    // Currency formatting
+                    if (colNumber >= 11 && colNumber <= 13) {
+                        cell.numFmt = '#,##0" ₺"';
+                    }
+                });
             });
 
-            // Calculate Totals
+            worksheet.addRow([]); // Empty row
+
+            // Footer / Totals
             const totalTutar = filteredAndSorted.reduce((acc, r) => acc + (r.totalPrice || 0), 0);
             const totalOdenen = filteredAndSorted.reduce((acc, r) => acc + (r.depositAmount || 0), 0);
             const totalKalan = totalTutar - totalOdenen;
 
-            const footerRow = ['', '', '', '', '', '', '', 'GENEL TOPLAM:', totalTutar, totalOdenen, totalKalan, '', '', '', ''];
-
-            // Combine all data
-            const wsData = [
-                title,
-                [], // Empty row
-                headers,
-                ...dataRows,
-                [], // Empty row
-                footerRow
-            ];
-
-            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            const footerRowContent = ['', '', '', '', '', '', '', '', '', 'GENEL TOPLAM:', totalTutar, totalOdenen, totalKalan, '', '', ''];
+            const footerRow = worksheet.addRow(footerRowContent);
+            footerRow.font = { bold: true };
+            footerRow.eachCell((cell, colNumber) => {
+                if (colNumber >= 10 && colNumber <= 13) {
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FFF1F5F9' }
+                    };
+                    cell.border = {
+                        top: { style: 'medium' },
+                        left: { style: 'thin' },
+                        bottom: { style: 'medium' },
+                        right: { style: 'thin' }
+                    };
+                    if (colNumber >= 11) cell.numFmt = '#,##0" ₺"';
+                }
+            });
 
             // Column Widths
-            const colWidths = [
-                { wch: 5 },  // Sıra
-                { wch: 10 }, // Sipariş No
-                { wch: 25 }, // Ad Soyad
-                { wch: 15 }, // Telefon
-                { wch: 15 }, // Yedek Tel
-                { wch: 15 }, // Hisse
-                { wch: 20 }, // Grup
-                { wch: 10 }, // Gün
-                { wch: 15 }, // Toplam
-                { wch: 15 }, // Ödenen
-                { wch: 15 }, // Kalan
-                { wch: 15 }, // Ödeme Türü
-                { wch: 12 }, // Vade
-                { wch: 12 }, // Kayıt Tarihi
-                { wch: 40 }  // Açıklama
+            worksheet.columns = [
+                { width: 8 },  // Sıra
+                { width: 15 }, // Durum
+                { width: 12 }, // Sipariş No
+                { width: 15 }, // Sipariş Tarihi
+                { width: 30 }, // Ad Soyad
+                { width: 15 }, // Telefon
+                { width: 15 }, // Yedek Tel
+                { width: 20 }, // Hisse
+                { width: 20 }, // Grup
+                { width: 10 }, // Gün
+                { width: 15 }, // Totals
+                { width: 15 }, // Toplam
+                { width: 15 }, // Ödenen
+                { width: 15 }, // Kalan
+                { width: 18 }, // Ödeme Türü
+                { width: 15 }, // Vade
+                { width: 40 }  // Açıklama
             ];
-            ws['!cols'] = colWidths;
 
-            // Merge Title
-            ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 14 } }];
+            // Generate and Save
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            saveAs(blob, `kurban_listesi_premium_${new Date().toLocaleDateString('tr-TR')}.xlsx`);
 
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Kayıtlar');
-            XLSX.writeFile(wb, `kurban_listesi_${new Date().toLocaleDateString('tr-TR')}.xlsx`);
-        });
+        } catch (error) {
+            console.error('Excel Export Error:', error);
+            alert('Excel oluşturulurken bir hata oluştu.');
+        }
     }
 
     if (loading && records.length === 0) return <div className="loading"><div className="spinner" /></div>;

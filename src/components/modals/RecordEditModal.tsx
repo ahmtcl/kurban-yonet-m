@@ -471,41 +471,43 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
                             </div>
                         )}
 
-                        <div className="card" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', marginBottom: 20 }}>
-                            <h4 style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, color: '#166534' }}>
-                                <FiMessageSquare /> Müşteriye SMS Gönder
-                            </h4>
-                            <div className="form-group" style={{ marginBottom: 10 }}>
-                                <textarea
-                                    className="form-textarea"
-                                    placeholder="Mesajınızı buraya yazın..."
-                                    value={customMessage}
-                                    onChange={(e) => setCustomMessage(e.target.value)}
-                                    rows={3}
-                                    style={{ background: 'white' }}
-                                />
+                        {!isAdminView && (
+                            <div className="card" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', marginBottom: 20 }}>
+                                <h4 style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, color: '#166534' }}>
+                                    <FiMessageSquare /> Müşteriye SMS Gönder
+                                </h4>
+                                <div className="form-group" style={{ marginBottom: 10 }}>
+                                    <textarea
+                                        className="form-textarea"
+                                        placeholder="Mesajınızı buraya yazın..."
+                                        value={customMessage}
+                                        onChange={(e) => setCustomMessage(e.target.value)}
+                                        rows={3}
+                                        style={{ background: 'white' }}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 15 }}>
+                                    {settings?.smsTemplates?.map(t => (
+                                        <button
+                                            key={t.id}
+                                            className="btn btn-xs btn-ghost"
+                                            style={{ fontSize: 11, padding: '2px 8px', border: '1px solid #ccc' }}
+                                            onClick={() => setCustomMessage(replaceVariables(t.text))}
+                                        >
+                                            {t.label}
+                                        </button>
+                                    ))}
+                                </div>
+                                <button
+                                    className="btn btn-success btn-sm"
+                                    style={{ width: '100%' }}
+                                    onClick={handleSendCustomSms}
+                                    disabled={sendingSms || !customMessage.trim()}
+                                >
+                                    <FiSend /> {sendingSms ? 'Gönderiliyor...' : 'Manuel SMS Gönder'}
+                                </button>
                             </div>
-                            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 15 }}>
-                                {settings?.smsTemplates?.map(t => (
-                                    <button
-                                        key={t.id}
-                                        className="btn btn-xs btn-ghost"
-                                        style={{ fontSize: 11, padding: '2px 8px', border: '1px solid #ccc' }}
-                                        onClick={() => setCustomMessage(replaceVariables(t.text))}
-                                    >
-                                        {t.label}
-                                    </button>
-                                ))}
-                            </div>
-                            <button
-                                className="btn btn-success btn-sm"
-                                style={{ width: '100%' }}
-                                onClick={handleSendCustomSms}
-                                disabled={sendingSms || !customMessage.trim()}
-                            >
-                                <FiSend /> {sendingSms ? 'Gönderiliyor...' : 'Manuel SMS Gönder'}
-                            </button>
-                        </div>
+                        )}
 
                         <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
                             <div style={{ display: 'flex', gap: 10 }}>
@@ -539,16 +541,18 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
 
                             <div style={{ display: 'flex', gap: '10px' }}>
                                 <button className="btn btn-ghost" onClick={onClose} disabled={saving}>İptal</button>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <input
-                                        type="checkbox"
-                                        id="send-sms-toggle-edit"
-                                        checked={sendSmsToggle}
-                                        onChange={(e) => setSendSmsToggle(e.target.checked)}
-                                        style={{ width: 18, height: 18, cursor: 'pointer' }}
-                                    />
-                                    <label htmlFor="send-sms-toggle-edit" style={{ fontSize: 13, cursor: 'pointer', fontWeight: 600, color: 'var(--accent-primary)' }}>Müşteriye SMS Gönder</label>
-                                </div>
+                                {!isAdminView && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <input
+                                            type="checkbox"
+                                            id="send-sms-toggle-edit"
+                                            checked={sendSmsToggle}
+                                            onChange={(e) => setSendSmsToggle(e.target.checked)}
+                                            style={{ width: 18, height: 18, cursor: 'pointer' }}
+                                        />
+                                        <label htmlFor="send-sms-toggle-edit" style={{ fontSize: 13, cursor: 'pointer', fontWeight: 600, color: 'var(--accent-primary)' }}>Müşteriye SMS Gönder</label>
+                                    </div>
+                                )}
                                 <button className="btn btn-primary" onClick={handleRequestUpdate} disabled={saving}>
                                     <FiCheck /> {isAdmin ? 'Güncelle' : 'Doğrula ve Güncelle'}
                                 </button>

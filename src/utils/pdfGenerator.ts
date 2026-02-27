@@ -58,8 +58,8 @@ const createPdfContent = async (doc: jsPDF, record: Record, settings: Settings |
     doc.setFont(fontToUse, 'normal');
 
     // Logo or Company Title
+    let logoHeight = 0;
     try {
-        // We try to fetch the image first to ensure it exists and load it as base64
         const logoResponse = await fetch('/logo.png');
         if (logoResponse.ok) {
             const blob = await logoResponse.blob();
@@ -68,26 +68,44 @@ const createPdfContent = async (doc: jsPDF, record: Record, settings: Settings |
                 reader.onloadend = () => resolve(reader.result as string);
                 reader.readAsDataURL(blob);
             });
-            // Centered: 105 - (60 / 2) = 75. Unified size 60x30 to keep it naif but visible
-            doc.addImage(base64, 'PNG', 75, 10, 60, 30);
+
+            // Get image dimensions to maintain aspect ratio
+            const img = await new Promise<HTMLImageElement>((resolve) => {
+                const i = new Image();
+                i.onload = () => resolve(i);
+                i.src = base64;
+            });
+
+            const targetWidth = 70; // mm (increased from 50)
+            const ratio = img.height / img.width;
+            logoHeight = targetWidth * ratio;
+
+            // Limit height if it's too tall
+            if (logoHeight > 45) {
+                const scale = 45 / logoHeight;
+                logoHeight = 45;
+                const newWidth = targetWidth * scale;
+                doc.addImage(base64, 'PNG', 105 - (newWidth / 2), 10, newWidth, logoHeight);
+            } else {
+                doc.addImage(base64, 'PNG', 105 - (targetWidth / 2), 10, targetWidth, logoHeight);
+            }
         } else {
             throw new Error('Logo not found');
         }
     } catch (e) {
-        // Fallback to text title if logo is missing
         doc.setFont(fontToUse, 'bold');
         doc.setFontSize(22);
         doc.setTextColor(0);
         const title = settings?.companyTitle || 'KURBAN HİSSE YÖNETİM';
         doc.text(title, 105, 25, { align: 'center' });
-        doc.setFont(fontToUse, 'normal');
+        logoHeight = 15; // fallback height for text
     }
 
     doc.setFontSize(14);
-    doc.setTextColor(0); // Black
+    doc.setTextColor(0);
     const isZeroDeposit = (record.depositAmount || 0) === 0;
-    // Positioned below logo
-    doc.text(isZeroDeposit ? 'Kurban Hissesi Sipariş Makbuzu' : 'Kurban Hissesi Ödeme Makbuzu', 105, 55, { align: 'center' });
+    // Positioned dynamically below logo
+    doc.text(isZeroDeposit ? 'Kurban Hissesi Sipariş Makbuzu' : 'Kurban Hissesi Ödeme Makbuzu', 105, 15 + logoHeight + 10, { align: 'center' });
 
     // Date
     doc.setFontSize(10);
