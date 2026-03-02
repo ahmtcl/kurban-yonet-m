@@ -51,8 +51,16 @@ export default function AddMemberToGroupModal({ group, onClose, onSuccess }: Add
         }
     }
 
+    const MAX_GROUP_MEMBERS = 7;
+    const currentMemberCount = group.memberIds?.length || 0;
+    const remainingSlots = MAX_GROUP_MEMBERS - currentMemberCount;
+
     async function handleAddMembers() {
         if (selectedRecordIds.length === 0) return;
+        if (selectedRecordIds.length > remainingSlots) {
+            alert(`Bu gruba en fazla ${remainingSlots} kişi daha eklenebilir. (Mevcut: ${currentMemberCount}, Maksimum: ${MAX_GROUP_MEMBERS})`);
+            return;
+        }
         setSaving(true);
         try {
             // Add each selected record to the group
@@ -90,6 +98,15 @@ export default function AddMemberToGroupModal({ group, onClose, onSuccess }: Add
                     <p style={{ marginBottom: 15, color: '#666', fontSize: 13 }}>
                         <strong>{group.shareTypeName}</strong> ile aynı kilo aralığında olan ve herhangi bir gruba atanmamış kişiler listelenmektedir.
                     </p>
+                    {remainingSlots <= 0 ? (
+                        <div style={{ padding: 10, background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 6, marginBottom: 15, color: '#856404', fontSize: 13 }}>
+                            ⚠️ Bu grup zaten maksimum üye sayısına ({MAX_GROUP_MEMBERS}) ulaşmış. Yeni üye eklenemez.
+                        </div>
+                    ) : (
+                        <div style={{ padding: 10, background: '#e8f5e9', border: '1px solid #4caf50', borderRadius: 6, marginBottom: 15, color: '#2e7d32', fontSize: 13 }}>
+                            ✅ Bu gruba en fazla <strong>{remainingSlots}</strong> kişi daha eklenebilir. (Mevcut: {currentMemberCount}/{MAX_GROUP_MEMBERS})
+                        </div>
+                    )}
 
                     <div className="search-bar" style={{ marginBottom: 15 }}>
                         <FiSearch className="search-icon" />
@@ -118,8 +135,10 @@ export default function AddMemberToGroupModal({ group, onClose, onSuccess }: Add
                                     <input
                                         type="checkbox"
                                         checked={selectedRecordIds.includes(r.id)}
+                                        disabled={!selectedRecordIds.includes(r.id) && selectedRecordIds.length >= remainingSlots}
                                         onChange={(e) => {
                                             if (e.target.checked) {
+                                                if (selectedRecordIds.length >= remainingSlots) return;
                                                 setSelectedRecordIds([...selectedRecordIds, r.id]);
                                             } else {
                                                 setSelectedRecordIds(selectedRecordIds.filter(id => id !== r.id));
@@ -143,7 +162,7 @@ export default function AddMemberToGroupModal({ group, onClose, onSuccess }: Add
 
                 <div className="modal-footer">
                     <div style={{ fontSize: 13, color: '#666' }}>
-                        {selectedRecordIds.length} kişi seçildi
+                        {selectedRecordIds.length}/{remainingSlots} kişi seçildi
                     </div>
                     <div style={{ display: 'flex', gap: 10 }}>
                         <button className="btn btn-ghost" onClick={onClose} disabled={saving}>İptal</button>

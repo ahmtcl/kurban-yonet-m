@@ -105,6 +105,10 @@ export default function GruplarPage() {
 
     async function handleBulkCreateGroup() {
         if (!newGroupName.trim() || !newGroupShareType || selectedUnassignedIds.length === 0) return;
+        if (selectedUnassignedIds.length > 7) {
+            alert('Bir gruba en fazla 7 kişi eklenebilir. Lütfen en fazla 7 kişi seçin.');
+            return;
+        }
         try {
             const st = shareTypes.find(s => s.id === newGroupShareType);
             if (!st) return;
@@ -639,6 +643,11 @@ export default function GruplarPage() {
                             <p style={{ marginBottom: 20, fontSize: 14 }}>
                                 Seçilen <strong>{selectedUnassignedIds.length}</strong> hissedar için yeni bir grup oluşturulacaktır.
                             </p>
+                            {selectedUnassignedIds.length > 7 && (
+                                <div style={{ padding: 10, background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 6, marginBottom: 15, color: '#856404', fontSize: 13 }}>
+                                    ⚠️ Bir gruba en fazla 7 kişi eklenebilir. Şu an {selectedUnassignedIds.length} kişi seçili. Lütfen en fazla 7 kişi seçin.
+                                </div>
+                            )}
                             <div className="form-group">
                                 <label className="form-label">Grup Adı</label>
                                 <input
@@ -667,7 +676,7 @@ export default function GruplarPage() {
                             <button
                                 className="btn btn-success"
                                 onClick={handleBulkCreateGroup}
-                                disabled={!newGroupName.trim() || !newGroupShareType}
+                                disabled={!newGroupName.trim() || !newGroupShareType || selectedUnassignedIds.length > 7}
                             >
                                 Grubu Oluştur ve Kaydet
                             </button>

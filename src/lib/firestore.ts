@@ -13,6 +13,8 @@ import {
     Timestamp,
     setDoc,
     runTransaction, // Added runTransaction
+    arrayUnion,
+    arrayRemove,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type { ShareType, Record, Group, Settings, PaymentType, User, AppNotification } from '@/types';
@@ -213,17 +215,15 @@ export async function addMemberToGroup(groupId: string, recordId: string) {
     const groupSnap = await getDoc(groupRef);
     if (!groupSnap.exists()) return;
     const members = groupSnap.data().memberIds || [];
-    if (!members.includes(recordId)) {
-        await updateDoc(groupRef, { memberIds: [...members, recordId] });
+    if (members.length >= 7) {
+        throw new Error('Bu gruba en fazla 7 üye eklenebilir.');
     }
+    await updateDoc(groupRef, { memberIds: arrayUnion(recordId) });
 }
 
 export async function removeMemberFromGroup(groupId: string, recordId: string) {
     const groupRef = doc(db, 'groups', groupId);
-    const groupSnap = await getDoc(groupRef);
-    if (!groupSnap.exists()) return;
-    const members = (groupSnap.data().memberIds || []).filter((m: string) => m !== recordId);
-    await updateDoc(groupRef, { memberIds: members });
+    await updateDoc(groupRef, { memberIds: arrayRemove(recordId) });
 }
 
 export async function getGroupMembers(groupId: string): Promise<Record[]> {

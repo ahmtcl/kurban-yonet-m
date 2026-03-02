@@ -28,7 +28,7 @@ export default function MoveToGroupModal({ record, currentGroupId, onClose, onMo
             // Filter out current group and groups with different share type (optional, but safer)
             // For now, let's filter by share type to prevent mixing basic/premium shares if that matters.
             // If share types don't matter for grouping, remove the filter.
-            const compatibleGroups = res.filter(g => g.id !== currentGroupId && g.shareTypeId === record.shareTypeId);
+            const compatibleGroups = res.filter(g => g.id !== currentGroupId && g.shareTypeId === record.shareTypeId && g.memberIds.length < 7);
             setGroups(compatibleGroups);
         } catch (error) {
             console.error(error);
@@ -93,7 +93,7 @@ export default function MoveToGroupModal({ record, currentGroupId, onClose, onMo
                                     }}
                                 >
                                     <span style={{ fontWeight: 500 }}>{g.name}</span>
-                                    <span style={{ fontSize: 12, color: '#666' }}>{g.memberIds.length} Üye</span>
+                                    <span style={{ fontSize: 12, color: '#666' }}>{g.memberIds.length}/7 Üye</span>
                                 </div>
                             )) : (
                                 <div style={{ padding: 20, textAlign: 'center', color: '#dc3545', background: '#fff3cd', borderRadius: 4 }}>
