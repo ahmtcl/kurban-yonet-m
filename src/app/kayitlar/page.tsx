@@ -69,7 +69,7 @@ export default function KayitlarPage() {
                 (search.toLowerCase() === 'iptal bekliyor' && r.status === 'pending_cancellation');
             const matchShare = !filterShareType || r.shareTypeId === filterShareType;
             const matchPayment = !filterPayment || r.paymentType === filterPayment;
-            const matchGroup = !filterGroup || r.groupId === filterGroup;
+            const matchGroup = !filterGroup || (filterGroup === 'null' ? !r.groupId : r.groupId === filterGroup);
             const matchDay = !filterDay || r.daySelection?.toString() === filterDay;
             // Hide cancelled records if explicitly filtered (optional), otherwise show them
             const isNotCancelled = true; // Included all by default now, will be sorted to bottom
