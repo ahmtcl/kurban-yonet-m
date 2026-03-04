@@ -142,27 +142,33 @@ export default function Dashboard() {
         {/* Row 1: Summary Statistics */}
         <div className="stats-grid">
           {/* Total Shares & Target Progress */}
-          <div className="stat-card primary" style={{ background: 'linear-gradient(135deg, #e0e7ff 0%, #ffffff 100%)' }}>
-            <div className="stat-icon"><GiCow /></div>
-            <div className="stat-value" style={{ color: '#4338ca' }}>{buyukbasCount}</div>
-            <div className="stat-label">Toplam Büyükbaş</div>
+          <div className="stat-card primary" style={{ background: 'linear-gradient(135deg, #e0e7ff 0%, #ffffff 100%)', textAlign: 'left' }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', marginBottom: 12 }}>
+              BÜYÜKBAŞ HİSSELERİN SATIŞ TOPLAMI: <span style={{ color: '#4338ca' }}>{buyukbasCount}</span>
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#475569', marginBottom: 12 }}>
+              TOPLAM SATIŞ HEDEFİ: <span style={{ color: '#4338ca' }}>{targetCount}</span>
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#dc2626', marginBottom: 4 }}>
+              BUGÜN HEDEF: {dailyTarget}
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#dc2626', marginBottom: 14 }}>
+              BUGÜN SATILAN: {buyukbasToday}
+            </div>
 
             {/* Target Progress Bar */}
-            <div style={{ marginTop: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2, color: '#666' }}>
-                <span>Hedef: {targetCount}</span>
-                <span>%{targetPercentage.toFixed(1)}</span>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4, color: '#64748b' }}>
+                <span>Hedef İlerleme</span>
+                <span style={{ fontWeight: 700 }}>%{targetPercentage.toFixed(1)}</span>
               </div>
-              <div style={{ width: '100%', height: 6, background: '#cbd5e1', borderRadius: 3, overflow: 'hidden' }}>
+              <div style={{ width: '100%', height: 8, background: '#cbd5e1', borderRadius: 4, overflow: 'hidden' }}>
                 <div style={{
                   width: `${targetPercentage}%`,
                   height: '100%',
                   background: targetPercentage >= 100 ? '#10b981' : '#6366f1',
                   transition: 'width 0.5s ease-out'
                 }} />
-              </div>
-              <div style={{ fontSize: 13, color: '#dc2626', marginTop: 8, textAlign: 'right', fontWeight: 'bold' }}>
-                HEDEF: {dailyTarget} / BUGÜN: {buyukbasToday}
               </div>
             </div>
           </div>
