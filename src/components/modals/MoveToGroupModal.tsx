@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { FiX, FiArrowRight, FiCheck, FiAlertTriangle } from 'react-icons/fi';
-import { getGroups, updateRecord, addMemberToGroup, removeMemberFromGroup } from '@/lib/firestore';
+import { getGroups, getRecords, updateRecord, addMemberToGroup, removeMemberFromGroup } from '@/lib/firestore';
 import type { Group, Record } from '@/types';
 
 interface MoveToGroupModalProps {
@@ -17,6 +17,7 @@ export default function MoveToGroupModal({ record, currentGroupId, onClose, onMo
     const [selectedGroupId, setSelectedGroupId] = useState('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [allRecords, setAllRecords] = useState<Record[]>([]);
 
     useEffect(() => {
         loadGroups();
@@ -24,11 +25,19 @@ export default function MoveToGroupModal({ record, currentGroupId, onClose, onMo
 
     async function loadGroups() {
         try {
-            const res = await getGroups();
-            // Filter out current group and groups with different share type (optional, but safer)
-            // For now, let's filter by share type to prevent mixing basic/premium shares if that matters.
-            // If share types don't matter for grouping, remove the filter.
-            const compatibleGroups = res.filter(g => g.id !== currentGroupId && g.shareTypeId === record.shareTypeId && g.memberIds.length < 7);
+            const [res, recs] = await Promise.all([getGroups(), getRecords()]);
+            setAllRecords(recs);
+            const compatibleGroups = res.filter(g => {
+                if (g.id === currentGroupId) return false;
+                if (g.shareTypeId !== record.shareTypeId) return false;
+                if (g.memberIds.length >= 7) return false;
+                // Kesim günü kontrolü
+                if (g.memberIds.length > 0) {
+                    const memberDays = g.memberIds.map(mid => recs.find(r => r.id === mid)?.daySelection).filter(Boolean);
+                    if (memberDays.length > 0 && memberDays[0] !== record.daySelection) return false;
+                }
+                return true;
+            });
             setGroups(compatibleGroups);
         } catch (error) {
             console.error(error);

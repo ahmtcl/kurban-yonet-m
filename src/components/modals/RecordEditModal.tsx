@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { updateRecord, deleteRecord, getSettings, getShareTypes, getGroups, addMemberToGroup, removeMemberFromGroup, addNotification } from '@/lib/firestore'; // Added group utils
+import { updateRecord, deleteRecord, getSettings, getShareTypes, getGroups, getRecords, addMemberToGroup, removeMemberFromGroup, addNotification } from '@/lib/firestore';
 import type { Record as RecordType, PaymentType, Settings, ShareType, Group } from '@/types';
 import { generateReceipt } from '@/utils/pdfGenerator';
 import { useAuth } from '@/context/AuthContext';
@@ -22,6 +22,7 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
     const [settings, setSettings] = useState<Settings | null>(null);
     const [shareTypes, setShareTypes] = useState<ShareType[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
+    const [allRecords, setAllRecords] = useState<RecordType[]>([]);
     const [selectedGroupId, setSelectedGroupId] = useState<string>('');
 
     // OTP State
@@ -52,6 +53,7 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
         getSettings().then(setSettings).catch(console.error);
         getShareTypes().then(setShareTypes).catch(console.error);
         getGroups().then(setGroups).catch(console.error);
+        getRecords().then(setAllRecords).catch(console.error);
         setSelectedGroupId(record?.groupId || '');
         setDepositInput(record?.depositAmount ? record.depositAmount.toString() : '');
     }, [record]);
@@ -445,10 +447,12 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
                                 <option value="">--- Gruptan Çıkar / Grupsuz ---</option>
                                 {groups
                                     .filter(g => {
-                                        const groupST = shareTypes.find(st => st.id === g.shareTypeId);
-                                        const currentST = shareTypes.find(st => st.id === editRecord.shareTypeId);
-                                        if (!groupST || !currentST) return g.shareTypeId === editRecord.shareTypeId;
-                                        return groupST.minKg === currentST.minKg && groupST.maxKg === currentST.maxKg;
+                                        if (g.shareTypeId !== editRecord.shareTypeId) return false;
+                                        // Kesim günü kontrolü: gruptaki üyelerin günü eşleşmeli
+                                        if (g.memberIds.length === 0) return true; // Boş grup her zaman gösterilsin
+                                        const memberDays = g.memberIds.map(mid => allRecords.find(r => r.id === mid)?.daySelection).filter(Boolean);
+                                        if (memberDays.length === 0) return true;
+                                        return memberDays[0] === editRecord.daySelection;
                                     })
                                     .map(g => (
                                         <option key={g.id} value={g.id}>
@@ -458,7 +462,7 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
                                 }
                             </select>
                             <p style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
-                                * <strong>{editRecord.shareTypeName}</strong> ile aynı kilo aralığındaki tüm gruplar listelenmektedir.
+                                * Sadece <strong>{editRecord.shareTypeName}</strong> hisse tipine ait ve aynı kesim gününe sahip gruplar listelenmektedir.
                             </p>
                         </div>
 

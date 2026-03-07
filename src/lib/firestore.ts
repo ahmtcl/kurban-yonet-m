@@ -190,6 +190,7 @@ export async function getGroups(): Promise<Group[]> {
         shareTypeName: d.data().shareTypeName || '',
         description: d.data().description || '',
         memberIds: d.data().memberIds || [],
+        kesimSiraNo: d.data().kesimSiraNo ?? null,
         createdAt: d.data().createdAt?.toDate?.() || new Date(),
     }));
 }

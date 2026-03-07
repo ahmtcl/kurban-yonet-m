@@ -1,15 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FiEdit, FiTrash2, FiPlus, FiSettings, FiX, FiDownload, FiCheckSquare, FiSquare } from 'react-icons/fi';
+import { FiEdit, FiTrash2, FiPlus, FiSettings, FiX, FiDownload, FiCheckSquare, FiSquare, FiHash } from 'react-icons/fi';
 import { getGroups, getShareTypes, getRecords, removeMemberFromGroup, updateRecord, updateGroup, deleteGroup, getSettings } from '@/lib/firestore';
 import type { Group, ShareType, Record } from '@/types';
 import RecordEditModal from '@/components/modals/RecordEditModal';
 import MoveToGroupModal from '@/components/modals/MoveToGroupModal';
 import AddMemberToGroupModal from '@/components/modals/AddMemberToGroupModal';
+import { useAuth } from '@/context/AuthContext';
 import * as XLSX from 'xlsx';
 
 export default function GruplarPage() {
+    const { isAdmin } = useAuth();
     const [groups, setGroups] = useState<Group[]>([]);
     const [shareTypes, setShareTypes] = useState<ShareType[]>([]);
     const [records, setRecords] = useState<Record[]>([]);
@@ -35,6 +37,13 @@ export default function GruplarPage() {
 
     // Group Edit
     const [editingGroup, setEditingGroup] = useState<Group | null>(null);
+
+    // Kesim Sıra No State
+    const [editingKesimSiraGroupId, setEditingKesimSiraGroupId] = useState<string | null>(null);
+    const [kesimSiraInput, setKesimSiraInput] = useState('');
+    const [showBulkKesimModal, setShowBulkKesimModal] = useState(false);
+    const [bulkKesimShareType, setBulkKesimShareType] = useState('');
+    const [bulkKesimStartNo, setBulkKesimStartNo] = useState('');
 
     useEffect(() => {
         loadData();
@@ -103,6 +112,52 @@ export default function GruplarPage() {
         }
     }
 
+    // Kesim Sıra No - Manuel kaydet
+    async function handleSaveKesimSiraNo(groupId: string) {
+        const val = parseInt(kesimSiraInput);
+        if (isNaN(val) || val < 0) {
+            alert('Geçerli bir sıra numarası giriniz.');
+            return;
+        }
+        try {
+            await updateGroup(groupId, { kesimSiraNo: val } as any);
+            setEditingKesimSiraGroupId(null);
+            setKesimSiraInput('');
+            setRefreshTrigger(prev => prev + 1);
+        } catch (error) {
+            console.error(error);
+            alert('Sıra no kaydedilemedi.');
+        }
+    }
+
+    // Kesim Sıra No - Toplu atama
+    async function handleBulkKesimSiraNo() {
+        if (!bulkKesimShareType || !bulkKesimStartNo) return;
+        const startNo = parseInt(bulkKesimStartNo);
+        if (isNaN(startNo) || startNo < 0) {
+            alert('Geçerli bir başlangıç numarası giriniz.');
+            return;
+        }
+        try {
+            const targetGroups = groups
+                .filter(g => g.shareTypeId === bulkKesimShareType)
+                .sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+
+            await Promise.all(targetGroups.map(async (g, i) => {
+                await updateGroup(g.id, { kesimSiraNo: startNo + i } as any);
+            }));
+
+            setShowBulkKesimModal(false);
+            setBulkKesimShareType('');
+            setBulkKesimStartNo('');
+            setRefreshTrigger(prev => prev + 1);
+            alert(`${targetGroups.length} gruba sıra numarası atandı (${startNo} - ${startNo + targetGroups.length - 1}).`);
+        } catch (error) {
+            console.error(error);
+            alert('Toplu sıra no ataması başarısız.');
+        }
+    }
+
     async function handleBulkCreateGroup() {
         if (!newGroupName.trim() || !newGroupShareType || selectedUnassignedIds.length === 0) return;
         if (selectedUnassignedIds.length > 7) {
@@ -113,19 +168,23 @@ export default function GruplarPage() {
             const st = shareTypes.find(s => s.id === newGroupShareType);
             if (!st) return;
 
-            // NEW: Compatibility Check
+            // Compatibility Check: Only same shareTypeId allowed
             const incompatibleMembers = selectedUnassignedIds.map(id => records.find(r => r.id === id)).filter(r => {
                 if (!r) return false;
-                const memberST = shareTypes.find(mst => mst.id === r.shareTypeId);
-                if (!memberST) return false;
-                return memberST.minKg !== st.minKg || memberST.maxKg !== st.maxKg;
+                return r.shareTypeId !== newGroupShareType;
             });
 
             if (incompatibleMembers.length > 0) {
-                const confirmMix = confirm(
-                    `Seçtiğiniz ${incompatibleMembers.length} kişinin kilo aralığı, grup tipi (${st.name}) ile tam eşleşmiyor. \n\nYine de devam etmek istiyor musunuz?`
-                );
-                if (!confirmMix) return;
+                alert(`Seçtiğiniz ${incompatibleMembers.length} kişinin hisse tipi, seçilen grup tipi (${st.name}) ile eşleşmiyor. Farklı hisse tipindeki kişiler aynı gruba eklenemez.`);
+                return;
+            }
+
+            // Kesim günü kontrolü: seçilen kişilerin hepsi aynı güne sahip olmalı
+            const selectedRecords = selectedUnassignedIds.map(id => records.find(r => r.id === id)).filter(Boolean) as Record[];
+            const uniqueDays = [...new Set(selectedRecords.map(r => r.daySelection))];
+            if (uniqueDays.length > 1) {
+                alert(`Seçtiğiniz kişilerin kesim günleri farklı (${uniqueDays.map(d => d + '. Gün').join(', ')}). Aynı grupta farklı kesim günlerindeki kişiler bulunamaz.`);
+                return;
             }
 
             const { addGroup, addMemberToGroup } = await import('@/lib/firestore');
@@ -317,6 +376,16 @@ export default function GruplarPage() {
                         <FiDownload /> Excel'e Aktar
                         {selectedGroupIds.length > 0 && ` (${selectedGroupIds.length})`}
                     </button>
+                    {isAdmin && (
+                        <button
+                            className="btn btn-sm"
+                            onClick={() => setShowBulkKesimModal(true)}
+                            title="Toplu Kesim Sıra No Ver"
+                            style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#e65100', color: '#fff', border: 'none' }}
+                        >
+                            <FiHash /> Toplu Kesim Sıra No Ver
+                        </button>
+                    )}
                     <button className="btn btn-primary btn-sm" onClick={() => {
                         setRefreshTrigger(prev => prev + 1);
                         alert('Veriler yenilendi.');
@@ -527,9 +596,53 @@ export default function GruplarPage() {
                                             alignItems: 'center',
                                             minHeight: 45
                                         }}>
-                                            <span style={{ fontSize: 13, color: '#666', fontStyle: 'italic', maxWidth: '60%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                {group.description || 'Grup açıklaması yok'}
-                                            </span>
+                                            {/* Kesim Sıra No */}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                {editingKesimSiraGroupId === group.id ? (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                        <input
+                                                            type="number"
+                                                            className="form-input"
+                                                            style={{ width: 80, padding: '2px 6px', fontSize: 13, height: 28 }}
+                                                            value={kesimSiraInput}
+                                                            onChange={(e) => setKesimSiraInput(e.target.value)}
+                                                            autoFocus
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') handleSaveKesimSiraNo(group.id);
+                                                                if (e.key === 'Escape') { setEditingKesimSiraGroupId(null); setKesimSiraInput(''); }
+                                                            }}
+                                                        />
+                                                        <button className="btn btn-xs btn-success" onClick={() => handleSaveKesimSiraNo(group.id)} style={{ padding: '2px 6px' }}>✓</button>
+                                                        <button className="btn btn-xs btn-ghost" onClick={() => { setEditingKesimSiraGroupId(null); setKesimSiraInput(''); }} style={{ padding: '2px 6px' }}>✗</button>
+                                                    </div>
+                                                ) : (
+                                                    <div
+                                                        style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: 6,
+                                                            cursor: isAdmin ? 'pointer' : 'default',
+                                                            padding: '2px 8px',
+                                                            borderRadius: 4,
+                                                            background: group.kesimSiraNo ? '#fff3e0' : '#f5f5f5',
+                                                            border: `1px solid ${group.kesimSiraNo ? '#ff9800' : '#ddd'}`,
+                                                            fontSize: 13,
+                                                            fontWeight: 600,
+                                                            color: group.kesimSiraNo ? '#e65100' : '#999',
+                                                        }}
+                                                        onClick={() => {
+                                                            if (!isAdmin) return;
+                                                            setEditingKesimSiraGroupId(group.id);
+                                                            setKesimSiraInput(group.kesimSiraNo?.toString() || '');
+                                                        }}
+                                                        title={isAdmin ? 'Kesim sıra no düzenle' : ''}
+                                                    >
+                                                        <FiHash style={{ fontSize: 12 }} />
+                                                        {group.kesimSiraNo ? `Kesim No: ${group.kesimSiraNo}` : 'Sıra No Yok'}
+                                                        {isAdmin && <FiEdit style={{ fontSize: 10, opacity: 0.6 }} />}
+                                                    </div>
+                                                )}
+                                            </div>
                                             <button
                                                 className="btn btn-xs btn-primary"
                                                 style={{ fontSize: 12, padding: '4px 8px' }}
@@ -679,6 +792,76 @@ export default function GruplarPage() {
                                 disabled={!newGroupName.trim() || !newGroupShareType || selectedUnassignedIds.length > 7}
                             >
                                 Grubu Oluştur ve Kaydet
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Toplu Kesim Sıra No Modal */}
+            {showBulkKesimModal && (
+                <div className="modal-backdrop" onClick={() => setShowBulkKesimModal(false)}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+                        <div className="modal-header" style={{ background: '#e65100', color: '#fff' }}>
+                            <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <FiHash /> Toplu Kesim Sıra No Ver
+                            </h3>
+                            <button className="btn btn-icon btn-ghost" style={{ color: '#fff' }} onClick={() => setShowBulkKesimModal(false)}><FiX /></button>
+                        </div>
+                        <div className="modal-body">
+                            <p style={{ marginBottom: 20, fontSize: 14, color: '#666' }}>
+                                Bir ürün tipi seçin ve başlangıç numarasını girin. O tipteki tüm gruplara sıralı numara atanacaktır.
+                            </p>
+
+                            <div className="form-group" style={{ marginBottom: 20 }}>
+                                <label className="form-label" style={{ fontWeight: 600 }}>Ürün Tipi (Hisse Tipi)</label>
+                                <select
+                                    className="form-select"
+                                    value={bulkKesimShareType}
+                                    onChange={(e) => setBulkKesimShareType(e.target.value)}
+                                >
+                                    <option value="">-- Seçiniz --</option>
+                                    {shareTypes.filter(st => groups.some(g => g.shareTypeId === st.id)).map(st => {
+                                        const groupCount = groups.filter(g => g.shareTypeId === st.id).length;
+                                        return (
+                                            <option key={st.id} value={st.id}>
+                                                {st.name} ({groupCount} grup)
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                            </div>
+
+                            <div className="form-group" style={{ marginBottom: 20 }}>
+                                <label className="form-label" style={{ fontWeight: 600 }}>Başlangıç Numarası</label>
+                                <input
+                                    className="form-input"
+                                    type="number"
+                                    placeholder="Örn: 1"
+                                    value={bulkKesimStartNo}
+                                    onChange={(e) => setBulkKesimStartNo(e.target.value)}
+                                    min={0}
+                                />
+                            </div>
+
+                            {bulkKesimShareType && bulkKesimStartNo && (
+                                <div style={{ padding: 12, background: '#e8f5e9', borderRadius: 8, border: '1px solid #a5d6a7', marginBottom: 15, fontSize: 13 }}>
+                                    <strong>Önizleme:</strong> {shareTypes.find(s => s.id === bulkKesimShareType)?.name} tipindeki{' '}
+                                    <strong>{groups.filter(g => g.shareTypeId === bulkKesimShareType).length}</strong> gruba{' '}
+                                    <strong>{bulkKesimStartNo}</strong> - <strong>{parseInt(bulkKesimStartNo) + groups.filter(g => g.shareTypeId === bulkKesimShareType).length - 1}</strong>{' '}
+                                    arası sıra no atanacak.
+                                </div>
+                            )}
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-ghost" onClick={() => setShowBulkKesimModal(false)}>İptal</button>
+                            <button
+                                className="btn"
+                                style={{ background: '#e65100', color: '#fff', border: 'none' }}
+                                onClick={handleBulkKesimSiraNo}
+                                disabled={!bulkKesimShareType || !bulkKesimStartNo}
+                            >
+                                <FiHash /> Sıra No Ata
                             </button>
                         </div>
                     </div>

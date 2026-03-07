@@ -31,17 +31,23 @@ export default function AddMemberToGroupModal({ group, onClose, onSuccess }: Add
             ]);
             setShareTypes(allShareTypes);
 
-            const groupST = allShareTypes.find(st => st.id === group.shareTypeId);
+            // Gruptaki mevcut üyelerin kesim günü
+            const existingMemberDays = group.memberIds
+                .map(mid => allRecords.find(r => r.id === mid)?.daySelection)
+                .filter(Boolean);
+            const groupDaySelection = existingMemberDays.length > 0 ? existingMemberDays[0] : null;
 
             const eligible = allRecords.filter(r => {
                 // Not in a group
                 if (r.groupId && r.groupId !== '') return false;
 
-                // Check kilo range compatibility
-                const memberST = allShareTypes.find(st => st.id === r.shareTypeId);
-                if (!groupST || !memberST) return r.shareTypeId === group.shareTypeId;
+                // Only same share type
+                if (r.shareTypeId !== group.shareTypeId) return false;
 
-                return groupST.minKg === memberST.minKg && groupST.maxKg === memberST.maxKg;
+                // Kesim günü kontrolü: grup boşsa herkesi göster, doluysa aynı gün olmalı
+                if (groupDaySelection !== null && r.daySelection !== groupDaySelection) return false;
+
+                return true;
             });
             setRecords(eligible);
         } catch (error) {
@@ -96,7 +102,7 @@ export default function AddMemberToGroupModal({ group, onClose, onSuccess }: Add
 
                 <div className="modal-body">
                     <p style={{ marginBottom: 15, color: '#666', fontSize: 13 }}>
-                        <strong>{group.shareTypeName}</strong> ile aynı kilo aralığında olan ve herhangi bir gruba atanmamış kişiler listelenmektedir.
+                        Sadece <strong>{group.shareTypeName}</strong> hisse tipine ait, aynı kesim gününe sahip ve herhangi bir gruba atanmamış kişiler listelenmektedir.
                     </p>
                     {remainingSlots <= 0 ? (
                         <div style={{ padding: 10, background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 6, marginBottom: 15, color: '#856404', fontSize: 13 }}>

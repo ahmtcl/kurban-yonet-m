@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FiSave, FiUserPlus, FiCheck, FiX, FiPlus, FiUsers, FiInfo } from 'react-icons/fi';
-import { getShareTypes, getGroups, getSettings, addRecord, addGroup, addMemberToGroup, getGroupMembers, getRecordById } from '@/lib/firestore';
+import { getShareTypes, getGroups, getSettings, getRecords, addRecord, addGroup, addMemberToGroup, getGroupMembers, getRecordById } from '@/lib/firestore';
 import type { ShareType, Group, Settings, PaymentType, Record } from '@/types';
 import { generateReceipt } from '@/utils/pdfGenerator';
 import { sendSMS, generateOTP } from '@/utils/sms';
@@ -13,6 +13,7 @@ export default function YeniKayit() {
     const router = useRouter();
     const [shareTypes, setShareTypes] = useState<ShareType[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
+    const [allRecords, setAllRecords] = useState<Record[]>([]);
     const [settings, setSettings] = useState<Settings | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -63,14 +64,16 @@ export default function YeniKayit() {
 
     async function loadData() {
         try {
-            const [types, grps, sett] = await Promise.all([
+            const [types, grps, sett, recs] = await Promise.all([
                 getShareTypes(),
                 getGroups(),
                 getSettings(),
+                getRecords(),
             ]);
             setShareTypes(types.filter(t => t.isActive));
             setGroups(grps);
             setSettings(sett);
+            setAllRecords(recs);
         } catch (err) {
             console.error('Veri yüklenirken hata:', err);
         } finally {
@@ -600,8 +603,23 @@ export default function YeniKayit() {
                                             borderRadius: 4,
                                             background: '#fff'
                                         }}>
-                                            {groups.filter(g => g.shareTypeId === shareTypeId).length > 0 ? groups
-                                                .filter(g => g.shareTypeId === shareTypeId)
+                                            {groups.filter(g => {
+                                                if (g.shareTypeId !== shareTypeId) return false;
+                                                // Kesim günü kontrolü
+                                                if (g.memberIds.length > 0) {
+                                                    const memberDays = g.memberIds.map(mid => allRecords.find(r => r.id === mid)?.daySelection).filter(Boolean);
+                                                    if (memberDays.length > 0 && memberDays[0] !== (settings?.activeDay || 1)) return false;
+                                                }
+                                                return true;
+                                            }).length > 0 ? groups
+                                                .filter(g => {
+                                                    if (g.shareTypeId !== shareTypeId) return false;
+                                                    if (g.memberIds.length > 0) {
+                                                        const memberDays = g.memberIds.map(mid => allRecords.find(r => r.id === mid)?.daySelection).filter(Boolean);
+                                                        if (memberDays.length > 0 && memberDays[0] !== (settings?.activeDay || 1)) return false;
+                                                    }
+                                                    return true;
+                                                })
                                                 .map(g => (
                                                     <div
                                                         key={g.id}

@@ -58,6 +58,7 @@ export interface Group {
     shareTypeName?: string;
     description: string;
     memberIds: string[];
+    kesimSiraNo?: number | null;
     createdAt: Date;
 }
 
