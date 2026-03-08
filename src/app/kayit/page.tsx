@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FiSave, FiUserPlus, FiCheck, FiX, FiPlus, FiUsers, FiInfo } from 'react-icons/fi';
-import { getShareTypes, getGroups, getSettings, getRecords, addRecord, addGroup, addMemberToGroup, getGroupMembers, getRecordById } from '@/lib/firestore';
+import { getShareTypes, getGroups, getSettings, getRecords, addRecord, addGroup, addMemberToGroup, getGroupMembers, getRecordById, checkStockAvailability } from '@/lib/firestore';
 import type { ShareType, Group, Settings, PaymentType, Record } from '@/types';
 import { generateReceipt } from '@/utils/pdfGenerator';
 import { sendSMS, generateOTP } from '@/utils/sms';
@@ -30,6 +30,10 @@ export default function YeniKayit() {
     const [paymentType, setPaymentType] = useState<PaymentType>('nakit');
     const [dueDate, setDueDate] = useState('');
     const [notes, setNotes] = useState('');
+    const [isStockAvailable, setIsStockAvailable] = useState(true);
+    const [remainingStockCount, setRemainingStockCount] = useState<number | null>(null);
+    const [checkingStock, setCheckingStock] = useState(false);
+    const [isStockDefined, setIsStockDefined] = useState(false);
 
     // Auto-generated date (read-only)
     const [registrationDate] = useState(new Date().toISOString().split('T')[0]);
@@ -81,6 +85,32 @@ export default function YeniKayit() {
         }
     }
 
+    useEffect(() => {
+        if (shareTypeId) {
+            handleCheckStock(shareTypeId);
+        } else {
+            setIsStockAvailable(true);
+            setRemainingStockCount(null);
+        }
+    }, [shareTypeId]);
+
+    async function handleCheckStock(id: string) {
+        setCheckingStock(true);
+        try {
+            const result = await checkStockAvailability(id);
+            setIsStockAvailable(result.available);
+            setRemainingStockCount(result.remaining);
+            setIsStockDefined(result.stockDefined);
+        } catch (err) {
+            console.error('Stok kontrol hatası:', err);
+            setIsStockAvailable(true);
+            setRemainingStockCount(null);
+            setIsStockDefined(false);
+        } finally {
+            setCheckingStock(false);
+        }
+    }
+
     const selectedShareType = shareTypes.find((st) => st.id === shareTypeId);
     const totalPrice = selectedShareType?.price || 0;
     const kalanTutar = totalPrice - (parseFloat(depositAmount) || 0);
@@ -107,6 +137,20 @@ export default function YeniKayit() {
         e.preventDefault();
         if (!ownerName.trim() || !shareTypeId) {
             showToast('error', 'Ad Soyad ve Hisse Tipi zorunludur!');
+            return;
+        }
+
+        // Final stock check before proceeding
+        const stockResult = await checkStockAvailability(shareTypeId);
+        if (!stockResult.available) {
+            setIsStockAvailable(false);
+            setRemainingStockCount(0);
+            setIsStockDefined(stockResult.stockDefined);
+            if (stockResult.stockDefined) {
+                alert('⛔ BU HİSSE TİPİNDE STOK TÜKENMİŞTİR! Kayıt yapılamaz.');
+            } else {
+                alert('⚠️ Bu hisse tipi için stok adedi tanımlanmamıştır. Lütfen önce admin panelinden stok adedi giriniz.');
+            }
             return;
         }
 
@@ -149,6 +193,20 @@ export default function YeniKayit() {
     async function handleVerifyAndSave(isBypassed: boolean = false) {
         if (!isBypassed && userOtp !== serverOtp) {
             showToast('error', 'Hatalı doğrulama kodu!');
+            return;
+        }
+
+        const stockResult = await checkStockAvailability(shareTypeId);
+        if (!stockResult.available) {
+            if (stockResult.stockDefined) {
+                alert('⛔ BU HİSSE TİPİNDE STOK TÜKENMİŞTİR! Kayıt yapılamaz.');
+            } else {
+                alert('⚠️ Bu hisse tipi için stok adedi tanımlanmamıştır.');
+            }
+            setIsStockAvailable(false);
+            setRemainingStockCount(0);
+            setIsStockDefined(stockResult.stockDefined);
+            setSaving(false);
             return;
         }
 
@@ -359,6 +417,10 @@ export default function YeniKayit() {
                                 value={shareTypeId}
                                 onChange={(e) => setShareTypeId(e.target.value)}
                                 required
+                                style={{
+                                    borderColor: !isStockAvailable ? '#ef4444' : undefined,
+                                    backgroundColor: !isStockAvailable ? '#fef2f2' : undefined
+                                }}
                             >
                                 <option value="">Bir öğe seçin</option>
                                 {shareTypes.map((st) => (
@@ -367,6 +429,29 @@ export default function YeniKayit() {
                                     </option>
                                 ))}
                             </select>
+                            {shareTypeId && !checkingStock && isStockDefined && isStockAvailable && remainingStockCount !== null && (
+                                <div style={{ marginTop: 5, fontSize: 13, color: '#10b981', fontWeight: 600 }}>
+                                    Kalan Stok: {remainingStockCount}
+                                </div>
+                            )}
+                            {shareTypeId && !checkingStock && !isStockAvailable && (
+                                <div style={{
+                                    marginTop: 8,
+                                    padding: '10px 14px',
+                                    backgroundColor: '#fef2f2',
+                                    border: '2px solid #ef4444',
+                                    borderRadius: 6,
+                                    color: '#dc2626',
+                                    fontWeight: 700,
+                                    fontSize: 14,
+                                    textAlign: 'center'
+                                }}>
+                                    {isStockDefined
+                                        ? '⛔ BU HİSSE TİPİNDE STOK TÜKENMİŞTİR!'
+                                        : '⚠️ Bu hisse tipi için stok adedi bulunmamaktadır!'}
+                                </div>
+                            )}
+                            {checkingStock && <div style={{ marginTop: 5, fontSize: 12, color: '#666' }}>Stok kontrol ediliyor...</div>}
                         </div>
                         <div className="form-group">
                             <label className="form-label">Hisse Fiyatı</label>
@@ -505,7 +590,11 @@ export default function YeniKayit() {
                             <label htmlFor="send-sms-toggle" style={{ fontSize: 14, cursor: 'pointer', fontWeight: 600, color: 'var(--accent-primary)' }}>Müşteriye SMS Gönder</label>
                         </div>
 
-                        <button type="submit" className="btn btn-success" disabled={saving}>
+                        <button 
+                            type="submit" 
+                            className="btn btn-success" 
+                            disabled={saving || !isStockAvailable || checkingStock}
+                        >
                             {saving ? 'Kaydediliyor...' : 'Kaydı Tamamla'}
                         </button>
 

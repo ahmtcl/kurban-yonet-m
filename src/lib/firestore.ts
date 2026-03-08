@@ -352,3 +352,29 @@ export async function clearNotifications() {
     const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
     return Promise.all(deletePromises);
 }
+
+// ===== STOCK CONTROL =====
+export async function checkStockAvailability(shareTypeId: string): Promise<{ available: boolean; remaining: number; stockDefined: boolean }> {
+    const shareTypeSnap = await getDoc(doc(db, 'shareTypes', shareTypeId));
+    if (!shareTypeSnap.exists()) return { available: false, remaining: 0, stockDefined: false };
+    
+    const data = shareTypeSnap.data();
+    const stockQuantity = data.stockQuantity || 0;
+    
+    // If stock is not defined (0), block sales
+    if (stockQuantity === 0) {
+        return { available: false, remaining: 0, stockDefined: false };
+    }
+    
+    // Count active records (avoid != query which needs composite index)
+    const q = query(collection(db, 'records'), where('shareTypeId', '==', shareTypeId));
+    const snapshot = await getDocs(q);
+    const soldCount = snapshot.docs.filter(d => d.data().status !== 'cancelled').length;
+    
+    const remaining = stockQuantity - soldCount;
+    return {
+        available: remaining > 0,
+        remaining: remaining,
+        stockDefined: true
+    };
+}
