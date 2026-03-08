@@ -194,11 +194,20 @@ export default function YeniKayit() {
 
             // 4. Send Admin Notification SMS if enabled in settings
             if (settings?.newRecordSmsEnabled && settings.newRecordSmsNumbers?.trim()) {
-                const rawTemplate = settings.newRecordSmsTemplate || 'YENI KAYIT: {AD_SOYAD} - {HISSE_TIPI} - SIPARIS NO: {SIPARIS_NO}';
+                const rawTemplate = settings.newRecordSmsTemplate || 'YENI KAYIT: {AD_SOYAD} - {HISSE_TIPI} - {ODEME_YONTEMI} - SIPARIS NO: {SIPARIS_NO}';
+                const paymentLabels: { [key: string]: string } = {
+                    'nakit': 'Nakit',
+                    'kredi_karti': 'Kredi Kartı',
+                    'online_kredi_karti': 'Online K.K.',
+                    'havale': 'Havale/EFT',
+                    'teslimatta': 'Teslimatta'
+                };
+
                 const adminMessage = rawTemplate
                     .replace(/{AD_SOYAD}/g, ownerName.trim())
                     .replace(/{HISSE_TIPI}/g, selectedShareType?.name || '')
-                    .replace(/{SIPARIS_NO}/g, String(orderNo));
+                    .replace(/{SIPARIS_NO}/g, String(orderNo))
+                    .replace(/{ODEME_YONTEMI}/g, paymentLabels[paymentType] || paymentType);
 
                 const targetNumbers = settings.newRecordSmsNumbers
                     .split(',')

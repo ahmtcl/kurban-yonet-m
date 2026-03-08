@@ -30,6 +30,7 @@ export async function getShareTypes(): Promise<ShareType[]> {
         maxKg: d.data().maxKg,
         price: d.data().price,
         isActive: d.data().isActive ?? true,
+        stockQuantity: d.data().stockQuantity ?? 0,
         createdAt: d.data().createdAt?.toDate?.() || new Date(),
     }));
 
@@ -275,7 +276,7 @@ export async function getSettings(): Promise<Settings> {
             ],
             newRecordSmsEnabled: false,
             newRecordSmsNumbers: '',
-            newRecordSmsTemplate: 'YENI KAYIT: {AD_SOYAD} - {HISSE_TIPI} - SIPARIS NO: {SIPARIS_NO}',
+            newRecordSmsTemplate: 'YENI KAYIT: {AD_SOYAD} - {HISSE_TIPI} - {ODEME_YONTEMI} - SIPARIS NO: {SIPARIS_NO}',
         };
         await setDoc(doc(db, 'settings', 'general'), defaults);
         return defaults;

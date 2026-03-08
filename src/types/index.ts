@@ -5,6 +5,7 @@ export interface ShareType {
     maxKg: number;
     price: number;
     isActive: boolean;
+    stockQuantity: number;
     createdAt: Date;
 }
 

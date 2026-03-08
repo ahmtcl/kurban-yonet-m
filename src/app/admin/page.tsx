@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { FiLock, FiSettings, FiTag, FiLogOut, FiSave, FiPlus, FiTrash2, FiList, FiSearch, FiEdit, FiUsers, FiUserPlus, FiUserCheck, FiUserX, FiMessageSquare } from 'react-icons/fi';
-import { getSettings, updateSettings, getShareTypes, addShareType, deleteShareType, getRecords, getUsers, addUser, updateUser, deleteUser, getGroups } from '@/lib/firestore';
+import { getSettings, updateSettings, getShareTypes, addShareType, deleteShareType, updateShareType, getRecords, getUsers, addUser, updateUser, deleteUser, getGroups } from '@/lib/firestore';
 import type { Settings, ShareType, Record as RecordType, User, UserRole, Group } from '@/types';
 import RecordEditModal from '@/components/modals/RecordEditModal';
 import { useRouter } from 'next/navigation';
@@ -31,6 +31,8 @@ export default function AdminPage() {
     const [newSharePrice, setNewSharePrice] = useState('');
     const [newShareMinKg, setNewShareMinKg] = useState('');
     const [newShareMaxKg, setNewShareMaxKg] = useState('');
+    const [newShareStock, setNewShareStock] = useState('');
+    const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
     useEffect(() => {
         if (!authLoading && !user) {
@@ -126,17 +128,30 @@ export default function AdminPage() {
                 price: parseFloat(newSharePrice),
                 minKg: parseFloat(newShareMinKg) || 0,
                 maxKg: parseFloat(newShareMaxKg) || 0,
+                stockQuantity: parseInt(newShareStock) || 0,
                 isActive: true
             });
             setNewShareName('');
             setNewSharePrice('');
             setNewShareMinKg('');
             setNewShareMaxKg('');
+            setNewShareStock('');
             loadData();
         } catch (e) {
             alert('Ekleme hatası');
         } finally {
             setSaving(false);
+        }
+    }
+
+    async function handleUpdateStock(id: string, value: number) {
+        try {
+            await updateShareType(id, { stockQuantity: value });
+            setShareTypes(prev => prev.map(st => st.id === id ? { ...st, stockQuantity: value } : st));
+            setSaveStatus(id);
+            setTimeout(() => setSaveStatus(null), 2000);
+        } catch (e) {
+            alert('Stok güncelleme hatası');
         }
     }
 
@@ -403,7 +418,7 @@ export default function AdminPage() {
                                     <p style={{ fontSize: 13, color: '#666', marginBottom: 15 }}>
                                         Kayıt düzenleme ekranında hızlıca kullanabileceğiniz mesaj şablonlarını buradan yönetebilirsiniz.
                                         <br />
-                                        <span style={{ color: 'var(--accent-primary)', fontWeight: 500 }}>Değişkenler:</span> {`{AD_SOYAD}, {SIPARIS_NO}, {KESIM_GUNU}`}
+                                        <span style={{ color: 'var(--accent-primary)', fontWeight: 500 }}>Değişkenler:</span> {`{AD_SOYAD}, {SIPARIS_NO}, {KESIM_GUNU}, {ODEME_YONTEMI}`}
                                     </p>
 
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 15, marginBottom: 20 }}>
@@ -492,7 +507,8 @@ export default function AdminPage() {
                                     <span style={{ color: 'var(--accent-primary)', fontWeight: 500 }}>Kullanılabilir değişkenler:</span>{' '}
                                     <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 3, fontSize: 12 }}>{'{AD_SOYAD}'}</code>{' '}
                                     <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 3, fontSize: 12 }}>{'{HISSE_TIPI}'}</code>{' '}
-                                    <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 3, fontSize: 12 }}>{'{SIPARIS_NO}'}</code>
+                                    <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 3, fontSize: 12 }}>{'{SIPARIS_NO}'}</code>{' '}
+                                    <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 3, fontSize: 12 }}>{'{ODEME_YONTEMI}'}</code>
                                 </p>
 
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, padding: '12px 16px', background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0' }}>
@@ -594,7 +610,8 @@ export default function AdminPage() {
                                             {settings.newRecordSmsTemplate
                                                 .replace(/{AD_SOYAD}/g, 'Ahmet Yılmaz')
                                                 .replace(/{HISSE_TIPI}/g, '20-25 KG HİSSE')
-                                                .replace(/{SIPARIS_NO}/g, '59794')}
+                                                .replace(/{SIPARIS_NO}/g, '59794')
+                                                .replace(/{ODEME_YONTEMI}/g, 'Nakit')}
                                         </div>
                                     )}
                                 </div>
@@ -633,6 +650,10 @@ export default function AdminPage() {
                                         <label className="form-label">Max KG</label>
                                         <input type="number" className="form-input" value={newShareMaxKg} onChange={e => setNewShareMaxKg(e.target.value)} placeholder="0" />
                                     </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Stok Adedi</label>
+                                        <input type="number" className="form-input" value={newShareStock} onChange={e => setNewShareStock(e.target.value)} placeholder="0" />
+                                    </div>
                                     <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
                                         <button className="btn btn-primary" onClick={handleAddShareType} disabled={saving} style={{ height: 42 }}>
                                             <FiPlus /> Ekle
@@ -648,15 +669,51 @@ export default function AdminPage() {
                                                 <th style={{ padding: 10 }}>Hisse Adı</th>
                                                 <th style={{ padding: 10 }}>Fiyat</th>
                                                 <th style={{ padding: 10 }}>KG Aralığı</th>
+                                                <th style={{ padding: 10 }}>HİSSE STOK ADEDİ</th>
+                                                <th style={{ padding: 10 }}>SATILAN HİSSE ADEDİ</th>
+                                                <th style={{ padding: 10 }}>KALAN STOK ADEDİ</th>
                                                 <th style={{ padding: 10 }}>İşlem</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {shareTypes.map(st => (
+                                            {shareTypes.map(st => {
+                                                const soldCount = records.filter(r => r.shareTypeId === st.id && r.status !== 'cancelled').length;
+                                                const remainingStock = st.stockQuantity - soldCount;
+                                                return (
                                                 <tr key={st.id} style={{ borderBottom: '1px solid #eee' }}>
                                                     <td style={{ padding: 10, fontWeight: 500 }}>{st.name}</td>
                                                     <td style={{ padding: 10 }}>{st.price.toLocaleString('tr-TR')} ₺</td>
                                                     <td style={{ padding: 10 }}>{st.minKg} - {st.maxKg} KG</td>
+                                                    <td style={{ padding: 10 }}>
+                                                        <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                                                            <input
+                                                                type="number"
+                                                                className="form-input"
+                                                                style={{ width: 70, padding: '4px 8px', textAlign: 'center' }}
+                                                                value={st.stockQuantity}
+                                                                onChange={e => {
+                                                                    const val = parseInt(e.target.value) || 0;
+                                                                    setShareTypes(prev => prev.map(s => s.id === st.id ? { ...s, stockQuantity: val } : s));
+                                                                }}
+                                                            />
+                                                            <button
+                                                                className="btn btn-sm btn-success"
+                                                                onClick={() => handleUpdateStock(st.id, st.stockQuantity)}
+                                                                style={{ padding: '4px 12px', fontSize: 12 }}
+                                                            >
+                                                                Kaydet
+                                                            </button>
+                                                            {saveStatus === st.id && (
+                                                                <span style={{ fontSize: 11, color: '#10b981', fontWeight: 600, marginLeft: 4 }}>
+                                                                    Kaydedildi!
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: 10, fontWeight: 600, color: '#6366f1' }}>{soldCount}</td>
+                                                    <td style={{ padding: 10, fontWeight: 700, color: remainingStock > 0 ? '#10b981' : remainingStock === 0 ? '#f59e0b' : '#ef4444' }}>
+                                                        {remainingStock}
+                                                    </td>
                                                     <td style={{ padding: 10 }}>
                                                         <button
                                                             className="btn btn-sm btn-icon btn-danger"
@@ -666,7 +723,8 @@ export default function AdminPage() {
                                                         </button>
                                                     </td>
                                                 </tr>
-                                            ))}
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>

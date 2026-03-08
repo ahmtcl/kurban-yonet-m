@@ -38,10 +38,18 @@ export default function RecordEditModal({ record, onClose, onSave, isAdminView =
 
     const replaceVariables = (text: string) => {
         if (!record) return text;
+        const paymentLabels: { [key: string]: string } = {
+            'nakit': 'Nakit',
+            'kredi_karti': 'Kredi Kartı',
+            'online_kredi_karti': 'Online K.K.',
+            'havale': 'Havale/EFT',
+            'teslimatta': 'Teslimatta'
+        };
         return text
             .replace(/{AD_SOYAD}/g, record.ownerName)
             .replace(/{SIPARIS_NO}/g, record.orderNumber?.toString() || '')
-            .replace(/{KESIM_GUNU}/g, record.daySelection?.toString() || '');
+            .replace(/{KESIM_GUNU}/g, record.daySelection?.toString() || '')
+            .replace(/{ODEME_YONTEMI}/g, paymentLabels[record.paymentType] || record.paymentType);
     };
 
     useEffect(() => {

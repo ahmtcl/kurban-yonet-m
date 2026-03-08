@@ -78,12 +78,18 @@ export default function Dashboard() {
     const typeRecords = activeRecords.filter((r) => r.shareTypeId === st.id);
     const total = typeRecords.reduce((s, r) => s + (r.totalPrice || 0), 0);
     const collected = typeRecords.reduce((s, r) => s + (r.depositAmount || 0), 0);
+    const soldCount = typeRecords.length;
+    const stockQuantity = st.stockQuantity || 0;
+    const remainingStock = stockQuantity - soldCount;
     return {
       name: st.name,
       count: typeRecords.length,
       total,
       collected,
-      remaining: total - collected
+      remaining: total - collected,
+      stockQuantity,
+      soldCount,
+      remainingStock
     };
   });
 
@@ -209,16 +215,41 @@ export default function Dashboard() {
           {shareBreakdown.map((sb) => (
             <div key={sb.name} className="card" style={{ padding: 16, borderTop: '4px solid #6366f1' }}>
               <h4 style={{ fontSize: 15, fontWeight: 700, color: '#333', marginBottom: 8 }}>{sb.name}</h4>
+              {sb.stockQuantity > 0 && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <span style={{ color: '#666', fontSize: 13 }}>HİSSE STOK ADEDİ:</span>
+                    <span style={{ fontWeight: 600 }}>{sb.stockQuantity}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <span style={{ color: '#666', fontSize: 13 }}>SATILAN HİSSE ADEDİ:</span>
+                    <span style={{ fontWeight: 600, color: '#6366f1' }}>{sb.soldCount}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <span style={{ color: '#666', fontSize: 13 }}>KALAN STOK ADEDİ:</span>
+                    <span style={{ fontWeight: 700, color: sb.remainingStock > 0 ? '#10b981' : sb.remainingStock === 0 ? '#f59e0b' : '#ef4444' }}>{sb.remainingStock}</span>
+                  </div>
+                  <div style={{ marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #eee' }}>
+                    <div style={{ width: '100%', height: 4, background: '#e2e8f0', borderRadius: 2 }}>
+                      <div style={{
+                        width: `${sb.stockQuantity > 0 ? Math.min(100, (sb.soldCount / sb.stockQuantity) * 100) : 0}%`,
+                        height: '100%',
+                        background: sb.remainingStock > 0 ? '#6366f1' : '#ef4444',
+                        borderRadius: 2
+                      }} />
+                    </div>
+                    <div style={{ fontSize: 11, color: '#6366f1', marginTop: 4, textAlign: 'right' }}>
+                      %{sb.stockQuantity > 0 ? ((sb.soldCount / sb.stockQuantity) * 100).toFixed(0) : 0} Satıldı
+                    </div>
+                  </div>
+                </>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ color: '#666', fontSize: 13 }}>Adet:</span>
-                <span style={{ fontWeight: 600 }}>{sb.count}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ color: '#666', fontSize: 13 }}>Toplam:</span>
+                <span style={{ color: '#666', fontSize: 13 }}>TOPLAM SATIŞ TUTARI:</span>
                 <span style={{ fontWeight: 600 }}>{sb.total.toLocaleString('tr-TR')} ₺</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ color: '#666', fontSize: 13 }}>Kalan:</span>
+                <span style={{ color: '#666', fontSize: 13 }}>KALAN BAKİYE:</span>
                 <span style={{ fontWeight: 600, color: '#f59e0b' }}>{sb.remaining.toLocaleString('tr-TR')} ₺</span>
               </div>
               <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #eee' }}>
