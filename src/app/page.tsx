@@ -114,11 +114,6 @@ export default function Dashboard() {
   const diffTimeTarget = targetEndDate.getTime() - today.getTime();
   const targetDaysLeft = Math.max(0, Math.ceil(diffTimeTarget / (1000 * 60 * 60 * 24)));
 
-  const remainingCount = Math.max(0, targetCount - buyukbasCount);
-  
-  // Eğer satış yapılabilecek günler bittiyse (veya 0 kaldıysa), kalan tutarın tamamı bugünün hedefi olarak gösterilir.
-  const dailyTarget = targetDaysLeft > 0 ? (remainingCount / targetDaysLeft).toFixed(1) : remainingCount;
-
   // New: Today's sales calculation
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -128,6 +123,16 @@ export default function Dashboard() {
     const recordDate = (r.createdAt as any).toDate ? (r.createdAt as any).toDate() : new Date(r.createdAt);
     return recordDate >= todayStart;
   }).length;
+
+  // We need to calculate daily target based on what we had to achieve at the start of the day.
+  // So we take current remaining + what we already sold today, to get the total remaining for the start of the day.
+  // Then we divide by targetDaysLeft (which includes today).
+  
+  const remainingCount = Math.max(0, targetCount - buyukbasCount);
+  const startOfDayRemainingCount = remainingCount + buyukbasToday;
+  
+  // Eğer satış yapılabilecek günler bittiyse (veya 0 kaldıysa), kalan tutarın tamamı bugünün hedefi olarak gösterilir.
+  const dailyTarget = targetDaysLeft > 0 ? (startOfDayRemainingCount / targetDaysLeft).toFixed(1) : remainingCount;
 
   if (loading || authLoading) {
     return (
