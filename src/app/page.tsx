@@ -102,12 +102,22 @@ export default function Dashboard() {
   const targetCount = settings?.targetCount || 100;
   const targetPercentage = Math.min(100, (buyukbasCount / targetCount) * 100);
 
-  const targetDate = new Date('2026-05-27');
   const today = new Date();
-  const diffTime = targetDate.getTime() - today.getTime();
-  const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  // 1) Kalan Gün (26 Mayıs Arefe dahil sonuna kadar)
+  const arefeDate = new Date('2026-05-27'); // gece 00:00:00 (Yani 26 Mayıs sonu)
+  const diffTimeArefe = arefeDate.getTime() - today.getTime();
+  const daysLeftForSales = Math.max(0, Math.ceil(diffTimeArefe / (1000 * 60 * 60 * 24))); // Arefe dahil toplam kalan gün
+
+  // 2) Günlük Satış Hedefi için hesaplanacak olan günler (25 Mayıs dahil sonuna kadar)
+  const targetEndDate = new Date('2026-05-26'); // gece 00:00:00 (Yani 25 Mayıs sonu)
+  const diffTimeTarget = targetEndDate.getTime() - today.getTime();
+  const targetDaysLeft = Math.max(0, Math.ceil(diffTimeTarget / (1000 * 60 * 60 * 24)));
+
   const remainingCount = Math.max(0, targetCount - buyukbasCount);
-  const dailyTarget = daysLeft > 0 ? (remainingCount / daysLeft).toFixed(1) : 0;
+  
+  // Eğer satış yapılabilecek günler bittiyse (veya 0 kaldıysa), kalan tutarın tamamı bugünün hedefi olarak gösterilir.
+  const dailyTarget = targetDaysLeft > 0 ? (remainingCount / targetDaysLeft).toFixed(1) : remainingCount;
 
   // New: Today's sales calculation
   const todayStart = new Date();
@@ -148,18 +158,37 @@ export default function Dashboard() {
         {/* Row 1: Summary Statistics */}
         <div className="stats-grid">
           {/* Total Shares & Target Progress */}
-          <div className="stat-card primary" style={{ background: 'linear-gradient(135deg, #e0e7ff 0%, #ffffff 100%)', textAlign: 'left' }}>
+          <div className="stat-card primary" style={{ background: 'linear-gradient(135deg, #e0e7ff 0%, #ffffff 100%)', textAlign: 'left', position: 'relative' }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b', marginBottom: 12 }}>
               BÜYÜKBAŞ HİSSELERİN SATIŞ TOPLAMI: <span style={{ color: '#4338ca' }}>{buyukbasCount}</span>
             </div>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#475569', marginBottom: 12 }}>
               TOPLAM SATIŞ HEDEFİ: <span style={{ color: '#4338ca' }}>{targetCount}</span>
             </div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#dc2626', marginBottom: 4 }}>
-              BUGÜN HEDEF: {dailyTarget}
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#dc2626', marginBottom: 14 }}>
-              BUGÜN SATILAN: {buyukbasToday}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#dc2626', marginBottom: 4 }}>
+                  BUGÜN HEDEF: {dailyTarget}
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#dc2626' }}>
+                  BUGÜN SATILAN: {buyukbasToday}
+                </div>
+              </div>
+
+              {/* Kalan Gün Badge */}
+              <div style={{ 
+                background: '#e2e8f0', 
+                borderRadius: '8px', 
+                padding: '6px 16px', 
+                textAlign: 'center', 
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                border: '1px solid #cbd5e1'
+              }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#1e293b', lineHeight: 1.2 }}>KALAN</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#1e293b', lineHeight: 1.2 }}>GÜN</div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: '#1e293b', marginTop: 2 }}>{daysLeftForSales}</div>
+              </div>
             </div>
 
             {/* Target Progress Bar */}
