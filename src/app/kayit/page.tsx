@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { FiSave, FiUserPlus, FiCheck, FiX, FiPlus, FiUsers, FiInfo } from 'react-icons/fi';
 import { getShareTypes, getGroups, getSettings, getRecords, addRecord, addGroup, addMemberToGroup, getGroupMembers, getRecordById, checkStockAvailability } from '@/lib/firestore';
@@ -55,6 +55,9 @@ export default function YeniKayit() {
     const [sendSmsToggle, setSendSmsToggle] = useState(true); // New toggle state
     const [serverOtp, setServerOtp] = useState('');
     const [userOtp, setUserOtp] = useState('');
+
+    // Ref-based lock to prevent double submission
+    const isSubmitting = useRef(false);
 
     useEffect(() => {
         if (!authLoading && !user) {
@@ -135,10 +138,14 @@ export default function YeniKayit() {
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
+        if (isSubmitting.current) return;
         if (!ownerName.trim() || !shareTypeId) {
             showToast('error', 'Ad Soyad ve Hisse Tipi zorunludur!');
             return;
         }
+
+        isSubmitting.current = true;
+        setSaving(true);
 
         // Final stock check before proceeding
         const stockResult = await checkStockAvailability(shareTypeId);
@@ -151,6 +158,8 @@ export default function YeniKayit() {
             } else {
                 alert('⚠️ Bu hisse tipi için stok adedi tanımlanmamıştır. Lütfen önce admin panelinden stok adedi giriniz.');
             }
+            isSubmitting.current = false;
+            setSaving(false);
             return;
         }
 
@@ -160,7 +169,6 @@ export default function YeniKayit() {
             return;
         }
 
-        setSaving(true);
         try {
             // Send SMS Verification Code
             const code = generateOTP();
@@ -187,6 +195,7 @@ export default function YeniKayit() {
             showToast('error', 'SMS gönderilirken bir hata oluştu!');
         } finally {
             setSaving(false);
+            isSubmitting.current = false;
         }
     }
 
@@ -195,6 +204,9 @@ export default function YeniKayit() {
             showToast('error', 'Hatalı doğrulama kodu!');
             return;
         }
+
+        isSubmitting.current = true;
+        setSaving(true);
 
         const stockResult = await checkStockAvailability(shareTypeId);
         if (!stockResult.available) {
@@ -207,10 +219,9 @@ export default function YeniKayit() {
             setRemainingStockCount(0);
             setIsStockDefined(stockResult.stockDefined);
             setSaving(false);
+            isSubmitting.current = false;
             return;
         }
-
-        setSaving(true);
         try {
             const newRecordData = {
                 ownerName: ownerName.trim(),
@@ -299,6 +310,7 @@ export default function YeniKayit() {
             showToast('error', 'Kayıt oluşturulurken hata oluştu!');
         } finally {
             setSaving(false);
+            isSubmitting.current = false;
         }
     }
 

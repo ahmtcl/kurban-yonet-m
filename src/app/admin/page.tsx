@@ -110,7 +110,8 @@ export default function AdminPage() {
         if (!settings) return;
         setSaving(true);
         try {
-            await updateSettings(settings);
+            const { lastOrderNumber, ...settingsToSave } = settings as Settings & { lastOrderNumber?: number };
+            await updateSettings(settingsToSave);
             alert('Ayarlar kaydedildi!');
         } catch (e) {
             alert('Hata oluştu!');
