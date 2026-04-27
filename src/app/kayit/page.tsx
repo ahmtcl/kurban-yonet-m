@@ -327,7 +327,15 @@ export default function YeniKayit() {
             setServerOtp('');
         } catch (err) {
             console.error('Kayıt hatası:', err);
-            showToast('error', 'Kayıt oluşturulurken hata oluştu!');
+            let errorMsg = 'Kayıt oluşturulurken hata oluştu!';
+            if (err instanceof Error) {
+                errorMsg += ' ' + err.message;
+            } else if (typeof err === 'string') {
+                errorMsg += ' ' + err;
+            } else if (err && typeof err === 'object' && 'message' in err) {
+                errorMsg += ' ' + (err as any).message;
+            }
+            showToast('error', errorMsg);
         } finally {
             setSaving(false);
             isSubmitting.current = false;
