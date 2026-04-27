@@ -185,7 +185,8 @@ export default function YeniKayit() {
             let verificationTemplate = settings?.smsTemplates?.find(t => t.id === 'verification')?.text || 'Sayın {AD_SOYAD}, doğrulama kodunuz: {KOD}';
             const message = verificationTemplate
                 .replace(/{AD_SOYAD}/g, ownerName.trim())
-                .replace(/{KOD}/g, code);
+                .replace(/{KOD}/g, code)
+                .replace(/{HISSE_TIPI}/g, selectedShareType?.name || '');
 
             const smsResult = await sendSMS(targetPhone, message);
 
