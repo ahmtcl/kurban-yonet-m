@@ -181,7 +181,12 @@ export default function YeniKayit() {
                 return;
             }
 
-            const message = `Sayin ${ownerName}, kurban kayit islemi icin dogrulama kodunuz: ${code}`;
+            // Şablon kullanımı
+            let verificationTemplate = settings?.smsTemplates?.find(t => t.id === 'verification')?.text || 'Sayın {AD_SOYAD}, doğrulama kodunuz: {KOD}';
+            const message = verificationTemplate
+                .replace(/{AD_SOYAD}/g, ownerName.trim())
+                .replace(/{KOD}/g, code);
+
             const smsResult = await sendSMS(targetPhone, message);
 
             if (smsResult) {
@@ -257,7 +262,21 @@ export default function YeniKayit() {
 
             // 3. Send Confirmation SMS if toggle is ON
             if (sendSmsToggle) {
-                const confirmMessage = `SAYIN MUSTERIMIZ , ${selectedShareType?.name || ''} KURBAN SIPARISINIZ ALINMISTIR. KURBANINIZI BAYRAMIN 1. GUNU OLAN 27.05.2026 ÇARŞAMBA GUNU 18:00-23:00 SAATLERİ ICINDE TESLIM ALABILIRSINIZ. ALLAH KABUL ETSIN SIPARIS NO: ${orderNo}`;
+                let infoTemplate = settings?.smsTemplates?.find(t => t.id === 'record_info')?.text || 'Sayın {AD_SOYAD}, kaydınız başarıyla oluşturuldu. Sipariş No: {SIPARIS_NO}, Kesim Günü: {KESIM_GUNU}';
+                const paymentLabels: { [key: string]: string } = {
+                    'nakit': 'Nakit',
+                    'kredi_karti': 'Kredi Kartı',
+                    'online_kredi_karti': 'Online K.K.',
+                    'havale': 'Havale/EFT',
+                    'teslimatta': 'Teslimatta'
+                };
+                const gunLabel = settings?.activeDay === 3 ? '3. Gün' : settings?.activeDay === 2 ? '2. Gün' : '1. Gün';
+                const confirmMessage = infoTemplate
+                    .replace(/{AD_SOYAD}/g, ownerName.trim())
+                    .replace(/{SIPARIS_NO}/g, String(orderNo))
+                    .replace(/{KESIM_GUNU}/g, gunLabel)
+                    .replace(/{HISSE_TIPI}/g, selectedShareType?.name || '')
+                    .replace(/{ODEME_YONTEMI}/g, paymentLabels[paymentType] || paymentType);
                 await sendSMS(phone, confirmMessage);
             }
 

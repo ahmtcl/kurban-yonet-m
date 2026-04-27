@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { FiLock, FiSettings, FiTag, FiLogOut, FiSave, FiPlus, FiTrash2, FiList, FiSearch, FiEdit, FiUsers, FiUserPlus, FiUserCheck, FiUserX, FiMessageSquare } from 'react-icons/fi';
 import { getSettings, updateSettings, getShareTypes, addShareType, deleteShareType, updateShareType, getRecords, getUsers, addUser, updateUser, deleteUser, getGroups } from '@/lib/firestore';
@@ -23,7 +23,16 @@ export default function AdminPage() {
     const [groups, setGroups] = useState<Group[]>([]);
 
     // Search & Edit State
-    const [searchQuery, setSearchQuery] = useState('');
+    // Filtreler
+    const [search, setSearch] = useState('');
+    const [filterShareType, setFilterShareType] = useState('');
+    const [filterPayment, setFilterPayment] = useState('');
+    const [filterGroup, setFilterGroup] = useState('');
+    const [filterDay, setFilterDay] = useState('');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [dateFilterType, setDateFilterType] = useState<'createdAt' | 'updatedAt'>('createdAt');
+    const [filterCreatedBy, setFilterCreatedBy] = useState('');
     const [selectedRecord, setSelectedRecord] = useState<RecordType | null>(null);
 
     // New Share Type State
@@ -166,24 +175,56 @@ export default function AdminPage() {
         }
     }
 
-    const filteredRecords = records
-        .filter(r =>
-            r.ownerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (r.phone && r.phone.includes(searchQuery)) ||
-            (r.orderNumber && r.orderNumber.toString().includes(searchQuery))
-        )
-        .sort((a, b) => {
-            // 1. Prioritize pending cancellation requests and payment approvals
+    // Benzersiz personel listesi
+    const createdByList = useMemo(() => {
+        const names = records.map(r => r.createdBy || '').filter(Boolean);
+        return Array.from(new Set(names));
+    }, [records]);
+
+    const filteredRecords = useMemo(() => {
+        let result = records.filter((r) => {
+            const matchSearch = !search ||
+                r.ownerName.toLowerCase().includes(search.toLowerCase()) ||
+                r.phone.includes(search) ||
+                (r.orderNumber && r.orderNumber.toString().includes(search)) ||
+                r.notes?.toLowerCase().includes(search.toLowerCase());
+            const matchShare = !filterShareType || r.shareTypeId === filterShareType;
+            const matchPayment = !filterPayment || r.paymentType === filterPayment;
+            const matchGroup = !filterGroup || (filterGroup === 'null' ? !r.groupId : r.groupId === filterGroup);
+            const matchDay = !filterDay || r.daySelection?.toString() === filterDay;
+            const matchCreatedBy = !filterCreatedBy || r.createdBy === filterCreatedBy;
+
+            let matchDate = true;
+            if (startDate || endDate) {
+                const targetDate = dateFilterType === 'updatedAt'
+                    ? (r.updatedAt ? new Date(r.updatedAt) : null)
+                    : new Date(r.createdAt);
+                if (targetDate) {
+                    targetDate.setHours(0, 0, 0, 0);
+                    if (startDate) {
+                        const start = new Date(startDate);
+                        start.setHours(0, 0, 0, 0);
+                        if (targetDate < start) matchDate = false;
+                    }
+                    if (endDate) {
+                        const end = new Date(endDate);
+                        end.setHours(0, 0, 0, 0);
+                        if (targetDate > end) matchDate = false;
+                    }
+                }
+            }
+            return matchSearch && matchShare && matchPayment && matchGroup && matchDay && matchDate && matchCreatedBy;
+        });
+        // Sıralama
+        return result.sort((a, b) => {
             const priorityA = a.status === 'pending_cancellation' ? 2 : (a.status === 'waiting_approval' ? 1 : 0);
             const priorityB = b.status === 'pending_cancellation' ? 2 : (b.status === 'waiting_approval' ? 1 : 0);
-
             if (priorityA !== priorityB) return priorityB - priorityA;
-
-            // 2. Then sort by orderNumber desc (newest first)
             const orderA = a.orderNumber || 0;
             const orderB = b.orderNumber || 0;
             return orderB - orderA;
         });
+    }, [records, search, filterShareType, filterPayment, filterGroup, filterDay, startDate, endDate, dateFilterType, filterCreatedBy]);
 
     if (isAdmin) {
         return (
@@ -238,18 +279,72 @@ export default function AdminPage() {
                     <>
                         {activeTab === 'collections' && (
                             <div className="card">
-                                <div style={{ marginBottom: 20, display: 'flex', gap: 10 }}>
-                                    <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                                        <div style={{ position: 'relative' }}>
-                                            <input
-                                                className="form-input"
-                                                placeholder="İsim, telefon veya sipariş no ile ara..."
-                                                value={searchQuery}
-                                                onChange={(e) => setSearchQuery(e.target.value)}
-                                                style={{ paddingLeft: 35 }}
-                                            />
-                                            <FiSearch style={{ position: 'absolute', left: 10, top: 12, color: '#999' }} />
-                                        </div>
+                                {/* Filtreler */}
+                                <div style={{ marginBottom: 20, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                                    <div className="form-group" style={{ minWidth: 220, flex: 1 }}>
+                                        <input
+                                            className="form-input"
+                                            placeholder="İsim, telefon veya sipariş no ile ara..."
+                                            value={search}
+                                            onChange={e => setSearch(e.target.value)}
+                                            style={{ paddingLeft: 35 }}
+                                        />
+                                        <FiSearch style={{ position: 'absolute', left: 10, top: 12, color: '#999', pointerEvents: 'none' }} />
+                                    </div>
+                                    <div className="form-group" style={{ minWidth: 160 }}>
+                                        <select className="form-select" value={filterShareType} onChange={e => setFilterShareType(e.target.value)}>
+                                            <option value="">Hisse Tipi (Tümü)</option>
+                                            {shareTypes.map(st => (
+                                                <option key={st.id} value={st.id}>{st.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="form-group" style={{ minWidth: 140 }}>
+                                        <select className="form-select" value={filterPayment} onChange={e => setFilterPayment(e.target.value)}>
+                                            <option value="">Ödeme Türü (Tümü)</option>
+                                            <option value="nakit">Nakit</option>
+                                            <option value="kredi_karti">Kredi Kartı</option>
+                                            <option value="online_kredi_karti">Online K.K.</option>
+                                            <option value="havale">Havale/EFT</option>
+                                            <option value="teslimatta">Teslimatta</option>
+                                        </select>
+                                    </div>
+                                    <div className="form-group" style={{ minWidth: 140 }}>
+                                        <select className="form-select" value={filterGroup} onChange={e => setFilterGroup(e.target.value)}>
+                                            <option value="">Grup (Tümü)</option>
+                                            <option value="null">Grupsuz</option>
+                                            {groups.map(g => (
+                                                <option key={g.id} value={g.id}>{g.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="form-group" style={{ minWidth: 110 }}>
+                                        <select className="form-select" value={filterDay} onChange={e => setFilterDay(e.target.value)}>
+                                            <option value="">Gün (Tümü)</option>
+                                            <option value="1">1. Gün</option>
+                                            <option value="2">2. Gün</option>
+                                            <option value="3">3. Gün</option>
+                                        </select>
+                                    </div>
+                                    <div className="form-group" style={{ minWidth: 170 }}>
+                                        <select className="form-select" value={filterCreatedBy} onChange={e => setFilterCreatedBy(e.target.value)}>
+                                            <option value="">Personel (Tümü)</option>
+                                            {createdByList.map(name => (
+                                                <option key={name} value={name}>{name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="form-group" style={{ minWidth: 120 }}>
+                                        <select className="form-select" value={dateFilterType} onChange={e => setDateFilterType(e.target.value as any)}>
+                                            <option value="createdAt">Kayıt Tarihi</option>
+                                            <option value="updatedAt">Güncelleme Tarihi</option>
+                                        </select>
+                                    </div>
+                                    <div className="form-group" style={{ minWidth: 140 }}>
+                                        <input type="date" className="form-input" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                                    </div>
+                                    <div className="form-group" style={{ minWidth: 140 }}>
+                                        <input type="date" className="form-input" value={endDate} onChange={e => setEndDate(e.target.value)} />
                                     </div>
                                 </div>
 

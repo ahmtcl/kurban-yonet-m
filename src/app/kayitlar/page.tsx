@@ -27,6 +27,7 @@ export default function KayitlarPage() {
 
     const [toast, setToast] = useState<{ type: string; message: string } | null>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+    const [filterCreatedBy, setFilterCreatedBy] = useState('');
 
     // Edit modal
     const [editRecord, setEditRecord] = useState<RecordType | null>(null);
@@ -59,6 +60,12 @@ export default function KayitlarPage() {
         } finally { setLoading(false); }
     }
 
+    // Benzersiz personel listesi
+    const createdByList = useMemo(() => {
+        const names = records.map(r => r.createdBy || '').filter(Boolean);
+        return Array.from(new Set(names));
+    }, [records]);
+
     const filteredAndSorted = useMemo(() => {
         const result = records.filter((r) => {
             const matchSearch = !search ||
@@ -71,6 +78,7 @@ export default function KayitlarPage() {
             const matchPayment = !filterPayment || r.paymentType === filterPayment;
             const matchGroup = !filterGroup || (filterGroup === 'null' ? !r.groupId : r.groupId === filterGroup);
             const matchDay = !filterDay || r.daySelection?.toString() === filterDay;
+            const matchCreatedBy = !filterCreatedBy || r.createdBy === filterCreatedBy;
             // Hide cancelled records if explicitly filtered (optional), otherwise show them
             const isNotCancelled = true; // Included all by default now, will be sorted to bottom
 
@@ -94,15 +102,11 @@ export default function KayitlarPage() {
                         if (targetDate > end) matchDate = false;
                     }
                 } else if (dateFilterType === 'updatedAt') {
-                    // If filtering by updated at but record matches search criteria otherwise, 
-                    // and we have a filter active, maybe exclude? 
-                    // If user selects a date range for updates, show only those with updates in that range.
-                    // If record has no updatedAt, it shouldn't match.
                     matchDate = false;
                 }
             }
 
-            return matchSearch && matchShare && matchPayment && matchGroup && matchDay && matchDate && isNotCancelled;
+            return matchSearch && matchShare && matchPayment && matchGroup && matchDay && matchDate && isNotCancelled && matchCreatedBy;
         });
 
         // Default sort logic
@@ -122,7 +126,7 @@ export default function KayitlarPage() {
             // 4. Secondary: newest first
             return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
-    }, [records, search, filterShareType, filterPayment, filterGroup, filterDay, startDate, endDate, dateFilterType]);
+    }, [records, search, filterShareType, filterPayment, filterGroup, filterDay, startDate, endDate, dateFilterType, filterCreatedBy]);
 
     // Summary
     const totalCount = filteredAndSorted.length;
@@ -484,6 +488,14 @@ export default function KayitlarPage() {
                         <option value="online_kredi_karti">Online Kredi Kartı</option>
                         <option value="havale">Havale</option>
                         <option value="teslimatta">Tamamı Teslimatta</option>
+                    </select>
+
+                    {/* Kaydeden Personel Filtresi */}
+                    <select className="form-select" style={{ width: 'auto', minWidth: 150 }} value={filterCreatedBy} onChange={(e) => setFilterCreatedBy(e.target.value)}>
+                        <option value="">Tüm Personeller</option>
+                        {Array.from(new Set(records.map(r => r.createdBy).filter(Boolean))).map(name => (
+                            <option key={name} value={name}>{name}</option>
+                        ))}
                     </select>
 
                     <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>

@@ -258,30 +258,40 @@ export async function getGroupMembers(groupId: string): Promise<Record[]> {
 // ===== SETTINGS =====
 export async function getSettings(): Promise<Settings> {
     const snap = await getDoc(doc(db, 'settings', 'general'));
-    if (!snap.exists()) {
-        const defaults: Settings = {
-            targetCount: 100,
-            day1Label: '1. Gün',
-            day2Label: '2. Gün',
-            companyName: '',
-            companyTitle: '',
-            daySelectionDefault: 1,
-            activeDay: 1,
-            moveButtonEnabled: true,
-            lastOrderNumber: 59793, // Initialize with 59793 so next is 59794
-            smsTemplates: [
-                { id: '1', label: 'Ödeme Hatırlatma', text: 'SAYIN {AD_SOYAD}, KURBAN KAYDINIZ ICIN ODEME BEKLENMEKTEDIR. BILGINIZE.' },
-                { id: '2', label: 'Grup Bilgisi', text: 'SAYIN {AD_SOYAD}, KURBAN GRUBUNUZ OLUSTURULMUSTUR. SIPARIS NO: {SIPARIS_NO}.' },
-                { id: '3', label: 'Kesim Günü', text: 'SAYIN {AD_SOYAD}, KURBANINIZ {KESIM_GUNU}. GUN KESILECEKTIR.' },
-            ],
-            newRecordSmsEnabled: false,
-            newRecordSmsNumbers: '',
-            newRecordSmsTemplate: 'YENI KAYIT: {AD_SOYAD} - {HISSE_TIPI} - {ODEME_YONTEMI} - SIPARIS NO: {SIPARIS_NO}',
+        const d = snap.data() || {};
+        // Varsayılan şablonlar
+        const defaultTemplates = [
+            {
+                id: 'verification',
+                label: 'Doğrulama Kodu',
+                text: 'Sayın {AD_SOYAD}, doğrulama kodunuz: {KOD}'
+            },
+            {
+                id: 'record_info',
+                label: 'Kayıt Bilgilendirme',
+                text: 'Sayın {AD_SOYAD}, kaydınız başarıyla oluşturuldu. Sipariş No: {SIPARIS_NO}, Kesim Günü: {KESIM_GUNU}'
+            }
+        ];
+        let smsTemplates = d.smsTemplates || [];
+        // Eksikse varsayılanları ekle (id ile kontrol)
+        defaultTemplates.forEach(def => {
+            if (!smsTemplates.some(t => t.id === def.id)) smsTemplates.push(def);
+        });
+        return {
+            targetCount: d.targetCount || 100,
+            day1Label: d.day1Label || '1. Gün',
+            day2Label: d.day2Label || '2. Gün',
+            companyName: d.companyName || '',
+            companyTitle: d.companyTitle || '',
+            daySelectionDefault: d.daySelectionDefault || 1,
+            activeDay: d.activeDay || 1,
+            moveButtonEnabled: d.moveButtonEnabled ?? true,
+            lastOrderNumber: d.lastOrderNumber,
+            smsTemplates,
+            newRecordSmsEnabled: d.newRecordSmsEnabled ?? false,
+            newRecordSmsNumbers: d.newRecordSmsNumbers || '',
+            newRecordSmsTemplate: d.newRecordSmsTemplate || '',
         };
-        await setDoc(doc(db, 'settings', 'general'), defaults);
-        return defaults;
-    }
-    return snap.data() as Settings;
 }
 
 export async function updateSettings(data: Partial<Settings>) {
