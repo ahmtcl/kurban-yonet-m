@@ -260,7 +260,7 @@ export async function getSettings(): Promise<Settings> {
     const snap = await getDoc(doc(db, 'settings', 'general'));
         const d = snap.data() || {};
         // Varsayılan şablonlar
-        const defaultTemplates = [
+        const defaultTemplates: import('@/types').SMSTemplate[] = [
             {
                 id: 'verification',
                 label: 'Doğrulama Kodu',
@@ -272,10 +272,10 @@ export async function getSettings(): Promise<Settings> {
                 text: 'Sayın {AD_SOYAD}, kaydınız başarıyla oluşturuldu. Sipariş No: {SIPARIS_NO}, Kesim Günü: {KESIM_GUNU}'
             }
         ];
-        let smsTemplates = d.smsTemplates || [];
+        let smsTemplates: import('@/types').SMSTemplate[] = Array.isArray(d.smsTemplates) ? d.smsTemplates : [];
         // Eksikse varsayılanları ekle (id ile kontrol)
-        defaultTemplates.forEach(def => {
-            if (!smsTemplates.some(t => t.id === def.id)) smsTemplates.push(def);
+        defaultTemplates.forEach((def) => {
+            if (!smsTemplates.some((t: import('@/types').SMSTemplate) => t.id === def.id)) smsTemplates.push(def);
         });
         return {
             targetCount: d.targetCount || 100,
