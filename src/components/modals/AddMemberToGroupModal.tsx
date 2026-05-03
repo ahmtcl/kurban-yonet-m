@@ -38,6 +38,9 @@ export default function AddMemberToGroupModal({ group, onClose, onSuccess }: Add
             const groupDaySelection = existingMemberDays.length > 0 ? existingMemberDays[0] : null;
 
             const eligible = allRecords.filter(r => {
+                // İptal edilen veya iptali bekleyen kayıtları gösterme
+                if (r.status === 'cancelled' || r.status === 'pending_cancellation') return false;
+
                 // Not in a group
                 if (r.groupId && r.groupId !== '') return false;
 
