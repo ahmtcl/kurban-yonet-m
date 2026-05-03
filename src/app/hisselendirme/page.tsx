@@ -1,16 +1,41 @@
 'use client';
 
-import { FiList, FiTag, FiScissors, FiGrid, FiXCircle } from 'react-icons/fi';
-
-const documents = [
-    { label: 'Tahsilat Listesi', icon: <FiList size={36} />, color: '#3b82f6' },
-    { label: 'Etiket',           icon: <FiTag size={36} />,  color: '#10b981' },
-    { label: 'Kesim Listesi',    icon: <FiScissors size={36} />, color: '#f59e0b' },
-    { label: 'Padok Listesi',    icon: <FiGrid size={36} />, color: '#8b5cf6' },
-    { label: 'İptal Edilenler',  icon: <FiXCircle size={36} />, color: '#ef4444' },
-];
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { FiList, FiTag, FiScissors, FiGrid, FiXCircle, FiFileText } from 'react-icons/fi';
+import { useAuth } from '@/context/AuthContext';
+import KesimListesiModal from '@/components/modals/KesimListesiModal';
+import TahsilatListesiModal from '@/components/modals/TahsilatListesiModal';
+import EtiketModal from '@/components/modals/EtiketModal';
+import PadokListesiModal from '@/components/modals/PadokListesiModal';
+import IptalEdilenlerModal from '@/components/modals/IptalEdilenlerModal';
+import VekaletListesiModal from '@/components/modals/VekaletListesiModal';
 
 export default function DokumanlarPage() {
+    const { isAdmin } = useAuth();
+    const router = useRouter();
+
+    if (!isAdmin) {
+        router.replace('/');
+        return null;
+    }
+
+    const [showKesimListesi, setShowKesimListesi]     = useState(false);
+    const [showTahsilatListesi, setShowTahsilatListesi] = useState(false);
+    const [showEtiket, setShowEtiket]                   = useState(false);
+    const [showPadokListesi, setShowPadokListesi]       = useState(false);
+    const [showIptalEdilenler, setShowIptalEdilenler]   = useState(false);
+    const [showVekalet, setShowVekalet]                   = useState(false);
+
+    const documents = [
+        { label: 'Tahsilat Listesi', icon: <FiList size={36} />,    color: '#3b82f6', onClick: () => setShowTahsilatListesi(true) },
+        { label: 'Etiket',           icon: <FiTag size={36} />,     color: '#10b981', onClick: () => setShowEtiket(true) },
+        { label: 'Kesim Listesi',    icon: <FiScissors size={36} />, color: '#f59e0b', onClick: () => setShowKesimListesi(true) },
+        { label: 'Padok Listesi',    icon: <FiGrid size={36} />,    color: '#8b5cf6', onClick: () => setShowPadokListesi(true) },
+        { label: 'İptal Edilenler',  icon: <FiXCircle size={36} />,  color: '#ef4444', onClick: () => setShowIptalEdilenler(true) },
+        { label: 'Vekalet Listesi',  icon: <FiFileText size={36} />, color: '#0891b2', onClick: () => setShowVekalet(true) },
+    ];
+
     return (
         <>
             <div className="top-bar">
@@ -23,9 +48,10 @@ export default function DokumanlarPage() {
                     gap: '1.5rem',
                     padding: '0.5rem 0',
                 }}>
-                    {documents.map(({ label, icon, color }) => (
+                    {documents.map(({ label, icon, color, onClick }) => (
                         <button
                             key={label}
+                            onClick={onClick}
                             style={{
                                 display: 'flex',
                                 flexDirection: 'column',
@@ -59,6 +85,30 @@ export default function DokumanlarPage() {
                     ))}
                 </div>
             </div>
+
+            {showKesimListesi && (
+                <KesimListesiModal onClose={() => setShowKesimListesi(false)} />
+            )}
+
+            {showTahsilatListesi && (
+                <TahsilatListesiModal onClose={() => setShowTahsilatListesi(false)} />
+            )}
+
+            {showEtiket && (
+                <EtiketModal onClose={() => setShowEtiket(false)} />
+            )}
+
+            {showPadokListesi && (
+                <PadokListesiModal onClose={() => setShowPadokListesi(false)} />
+            )}
+
+            {showIptalEdilenler && (
+                <IptalEdilenlerModal onClose={() => setShowIptalEdilenler(false)} />
+            )}
+
+            {showVekalet && (
+                <VekaletListesiModal onClose={() => setShowVekalet(false)} />
+            )}
         </>
     );
 }

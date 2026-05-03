@@ -26,7 +26,7 @@ const navItems = [
     { href: '/kayit', label: 'Yeni Kayıt', icon: <FiPlusCircle /> },
     { href: '/gruplar', label: 'Gruplar', icon: <FiUsers /> },
     { href: '/kayitlar', label: 'Kayıtlar', icon: <FiList /> },
-    { href: '/hisselendirme', label: 'Dökümanlar', icon: <FiTag /> },
+    { href: '/hisselendirme', label: 'Dökümanlar', icon: <FiTag />, adminOnly: true },
     { href: '/raporlar', label: 'Raporlar', icon: <FiBarChart2 /> },
     { href: '/admin', label: 'Admin Panel', icon: <FiSettings />, adminOnly: true },
 ];

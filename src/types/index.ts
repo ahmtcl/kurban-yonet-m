@@ -106,3 +106,13 @@ export interface AppNotification {
     isRead: boolean;
     createdAt: Date;
 }
+
+export interface VekaletSession {
+    id: string;
+    day: 1 | 2 | 3;
+    label: string;          // örn. "1. Gün — 1. Liste" veya "Ek Liste #2"
+    recordIds: string[];    // bu PDF'e dahil edilen kayıt id'leri
+    count: number;
+    createdAt: Date;
+    createdBy: string;
+}

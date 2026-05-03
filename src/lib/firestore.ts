@@ -17,7 +17,7 @@ import {
     arrayRemove,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { ShareType, Record, Group, Settings, PaymentType, User, AppNotification } from '@/types';
+import type { ShareType, Record, Group, Settings, PaymentType, User, AppNotification, VekaletSession } from '@/types';
 
 // ===== SHARE TYPES =====
 export async function getShareTypes(): Promise<ShareType[]> {
@@ -387,4 +387,34 @@ export async function checkStockAvailability(shareTypeId: string): Promise<{ ava
         remaining: remaining,
         stockDefined: true
     };
+}
+
+// ===== VEKALET SESSIONS =====
+export async function getVekaletSessions(day?: 1 | 2 | 3): Promise<VekaletSession[]> {
+    // Composite index gerektirmemek için client-side filtre + sıralama kullanılıyor
+    const q = query(collection(db, 'vekaletSessions'));
+    const snapshot = await getDocs(q);
+    const all = snapshot.docs.map(d => ({
+        id: d.id,
+        day: d.data().day,
+        label: d.data().label || '',
+        recordIds: d.data().recordIds || [],
+        count: d.data().count || 0,
+        createdAt: d.data().createdAt?.toDate?.() || new Date(),
+        createdBy: d.data().createdBy || '',
+    })) as VekaletSession[];
+    const filtered = day ? all.filter(s => s.day === day) : all;
+    return filtered.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+}
+
+export async function addVekaletSession(data: Omit<VekaletSession, 'id' | 'createdAt'>): Promise<string> {
+    const ref = await addDoc(collection(db, 'vekaletSessions'), {
+        ...data,
+        createdAt: serverTimestamp(),
+    });
+    return ref.id;
+}
+
+export async function deleteVekaletSession(id: string) {
+    return deleteDoc(doc(db, 'vekaletSessions', id));
 }

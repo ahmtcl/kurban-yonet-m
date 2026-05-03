@@ -79,8 +79,8 @@ export default function KayitlarPage() {
             const matchGroup = !filterGroup || (filterGroup === 'null' ? !r.groupId : r.groupId === filterGroup);
             const matchDay = !filterDay || r.daySelection?.toString() === filterDay;
             const matchCreatedBy = !filterCreatedBy || r.createdBy === filterCreatedBy;
-            // Hide cancelled records if explicitly filtered (optional), otherwise show them
-            const isNotCancelled = true; // Included all by default now, will be sorted to bottom
+            // İptali onaylananlar → İptal Edilenler sekmesine taşındı, burada gösterilmez
+            const isNotCancelled = r.status !== 'cancelled';
 
             let matchDate = true;
             if (startDate || endDate) {

@@ -7,6 +7,7 @@ import type { Group, ShareType, Record } from '@/types';
 import RecordEditModal from '@/components/modals/RecordEditModal';
 import MoveToGroupModal from '@/components/modals/MoveToGroupModal';
 import AddMemberToGroupModal from '@/components/modals/AddMemberToGroupModal';
+import MergeGroupModal from '@/components/modals/MergeGroupModal';
 import { useAuth } from '@/context/AuthContext';
 import * as XLSX from 'xlsx';
 
@@ -24,6 +25,7 @@ export default function GruplarPage() {
     const [moveRecord, setMoveRecord] = useState<{ record: Record; currentGroupId: string } | null>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<{ groupId: string; recordId: string } | null>(null);
     const [addMemberGroup, setAddMemberGroup] = useState<Group | null>(null);
+    const [mergeGroup, setMergeGroup] = useState<Group | null>(null);
     const [showBulkGroupModal, setShowBulkGroupModal] = useState(false);
 
     // Unassigned List State
@@ -522,7 +524,15 @@ export default function GruplarPage() {
                                                     onChange={() => toggleGroupSelection(group.id)}
                                                     style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#27ae60' }}
                                                 />
-                                                <span style={{ fontWeight: 600, fontSize: 16 }}>{group.name}</span>
+                                                <div>
+                                                    <span style={{ fontWeight: 600, fontSize: 16 }}>{group.name}</span>
+                                                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 2, fontWeight: 400 }}>
+                                                        {group.shareTypeName || shareTypes.find(st => st.id === group.shareTypeId)?.name || '—'}
+                                                        {members.length > 0 && members[0].daySelection
+                                                            ? ` · ${members[0].daySelection}. Gün`
+                                                            : ''}
+                                                    </div>
+                                                </div>
                                             </label>
                                             <button
                                                 className="btn btn-icon btn-sm btn-ghost"
@@ -643,13 +653,23 @@ export default function GruplarPage() {
                                                     </div>
                                                 )}
                                             </div>
-                                            <button
-                                                className="btn btn-xs btn-primary"
-                                                style={{ fontSize: 12, padding: '4px 8px' }}
-                                                onClick={() => setAddMemberGroup(group)}
-                                            >
-                                                <FiPlus /> Üye Ekle
-                                            </button>
+                                            <div style={{ display: 'flex', gap: 6 }}>
+                                                <button
+                                                    className="btn btn-xs btn-primary"
+                                                    style={{ fontSize: 12, padding: '4px 8px' }}
+                                                    onClick={() => setAddMemberGroup(group)}
+                                                >
+                                                    <FiPlus /> Üye Ekle
+                                                </button>
+                                                <button
+                                                    className="btn btn-xs"
+                                                    style={{ fontSize: 12, padding: '4px 8px', background: '#7b2d8b', color: '#fff', border: 'none' }}
+                                                    onClick={() => setMergeGroup(group)}
+                                                    title="Bu grupla başka bir grubu birleştir"
+                                                >
+                                                    Birleştir
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 );
@@ -741,6 +761,17 @@ export default function GruplarPage() {
                     group={addMemberGroup}
                     onClose={() => setAddMemberGroup(null)}
                     onSuccess={() => setRefreshTrigger(prev => prev + 1)}
+                />
+            )}
+
+            {/* Merge Group Modal */}
+            {mergeGroup && (
+                <MergeGroupModal
+                    targetGroup={mergeGroup}
+                    allGroups={groups}
+                    records={records}
+                    onClose={() => setMergeGroup(null)}
+                    onSuccess={() => { setMergeGroup(null); setRefreshTrigger(prev => prev + 1); }}
                 />
             )}
 

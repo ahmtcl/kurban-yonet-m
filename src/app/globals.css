@@ -930,3 +930,138 @@ tr:last-child td {
 .notification-item:hover {
   background-color: #f0f0f0 !important;
 }
+
+/* ============================= */
+/* EKSIK / EK SINIFLAR           */
+/* ============================= */
+
+/* layout-container = app-layout aliası */
+.layout-container {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* btn-xs — küçük tablo butonları */
+.btn-xs {
+  padding: 2px 7px;
+  font-size: 11px;
+  min-height: 24px;
+  border-radius: 3px;
+}
+
+/* modal-body — padding standardı */
+.modal-body {
+  padding: 16px 20px;
+}
+
+/* ============================= */
+/* MOBILE OVERRIDES — EK         */
+/* ============================= */
+@media (max-width: 768px) {
+
+  /* Gruplar grid: 400px minmax mobilde tek kolon yapar */
+  .groups-grid,
+  [style*="minmax(400px"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Top-bar aksiyonları: çok buton varsa yatay kaydır */
+  .top-bar {
+    align-items: flex-start;
+  }
+
+  .top-bar > div,
+  .top-bar > .top-bar-actions {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap !important;
+    padding-bottom: 4px;
+    max-width: 100%;
+  }
+
+  /* Tablo içeren bölümler yatay kaydırılabilir */
+  .page-content table,
+  .card table {
+    min-width: 560px;
+  }
+
+  .page-content .card,
+  .page-content > div {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Modal: ekranın tamamına yakın, tepeden başla */
+  .modal-backdrop {
+    align-items: flex-start;
+    padding: 16px 0 24px;
+    overflow-y: auto;
+  }
+
+  .modal {
+    width: 96%;
+    max-width: 96%;
+    max-height: none;
+    margin: 0 auto;
+    padding: 0;
+  }
+
+  .modal-header {
+    padding: 12px 16px 10px;
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 10;
+    border-radius: 6px 6px 0 0;
+  }
+
+  .modal-body {
+    padding: 12px 16px;
+  }
+
+  .modal-footer {
+    padding: 10px 16px 12px;
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    z-index: 10;
+  }
+
+  /* Modal içi form satırları zaten 1 kolona düşüyor,
+     ama modal'ın kendi padding'i 20px → 12px */
+  .modal > .form-group,
+  .modal > .modal-body > .form-group {
+    padding: 0 4px;
+  }
+
+  /* Dökümanlar buton grid: küçük ekranda 2 kolon yeterli */
+  [style*="minmax(220px"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* btn-xs mobilde biraz daha tıklanabilir */
+  .btn-xs {
+    min-height: 30px;
+    padding: 3px 8px;
+    font-size: 12px;
+  }
+
+  /* Grup kartları footer butonları wrap */
+  .group-card-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+}
+
+/* 400px altı ekranlar */
+@media (max-width: 400px) {
+  .top-bar h2 {
+    font-size: 14px;
+  }
+
+  [style*="minmax(220px"] {
+    grid-template-columns: 1fr !important;
+  }
+}
