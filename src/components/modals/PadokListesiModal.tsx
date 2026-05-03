@@ -51,7 +51,7 @@ export default function PadokListesiModal({ onClose }: Props) {
     });
 
     // Tip bazlı özet
-    const typeSummary: Record<string, number> = {};
+    const typeSummary: { [key: string]: number } = {};
     previewGroups.forEach(g => {
         const st = shareTypes.find(s => s.id === g.shareTypeId);
         const label = st?.name || 'Diğer';
