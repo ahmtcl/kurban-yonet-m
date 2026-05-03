@@ -23,7 +23,7 @@ export default function MergeGroupModal({ targetGroup, allGroups, records, onClo
     const targetDays = useMemo(() => {
         const days = targetGroup.memberIds
             .map(mid => records.find(r => r.id === mid)?.daySelection)
-            .filter((d): d is number => d !== undefined);
+            .filter((d): d is 1 | 2 | 3 => d !== undefined);
         return days.length > 0 ? days[0] : null;
     }, [targetGroup, records]);
 
@@ -34,7 +34,7 @@ export default function MergeGroupModal({ targetGroup, allGroups, records, onClo
             .map(g => {
                 const memberDays = g.memberIds
                     .map(mid => records.find(r => r.id === mid)?.daySelection)
-                    .filter((d): d is number => d !== undefined);
+                    .filter((d): d is 1 | 2 | 3 => d !== undefined);
                 const groupDay = memberDays.length > 0 ? memberDays[0] : null;
                 const dayMismatch = targetDays !== null && groupDay !== null && groupDay !== targetDays;
                 return { group: g, groupDay, dayMismatch };
