@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FiEdit, FiTrash2, FiPlus, FiSettings, FiX, FiDownload, FiCheckSquare, FiSquare, FiHash, FiLock } from 'react-icons/fi';
+import { FiEdit, FiTrash2, FiPlus, FiSettings, FiX, FiDownload, FiCheckSquare, FiSquare, FiHash, FiLock, FiVideo, FiSend } from 'react-icons/fi';
 import { getGroups, getShareTypes, getRecords, removeMemberFromGroup, updateRecord, updateGroup, deleteGroup, getSettings } from '@/lib/firestore';
 import type { Group, ShareType, Record } from '@/types';
 import RecordEditModal from '@/components/modals/RecordEditModal';
 import MoveToGroupModal from '@/components/modals/MoveToGroupModal';
 import AddMemberToGroupModal from '@/components/modals/AddMemberToGroupModal';
 import MergeGroupModal from '@/components/modals/MergeGroupModal';
+import VideoUploadModal from '@/components/modals/VideoUploadModal';
 import { useAuth } from '@/context/AuthContext';
 import * as XLSX from 'xlsx';
 
@@ -42,6 +43,9 @@ export default function GruplarPage() {
 
     // Grupsuzlar daraltma
     const [unassignedCollapsed, setUnassignedCollapsed] = useState(true);
+
+    // Video Upload State
+    const [videoUploadGroup, setVideoUploadGroup] = useState<Group | null>(null);
 
     // Kesim Sıra No State
     const [editingKesimSiraGroupId, setEditingKesimSiraGroupId] = useState<string | null>(null);
@@ -682,7 +686,35 @@ export default function GruplarPage() {
                                                     </div>
                                                 )}
                                             </div>
-                                            <div style={{ display: 'flex', gap: 6 }}>
+                                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                                                {/* Video Yükle */}
+                                                <button
+                                                    className="btn btn-xs"
+                                                    style={{ fontSize: 11, padding: '4px 8px', background: '#e11d48', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
+                                                    onClick={() => setVideoUploadGroup(group)}
+                                                    title="Video Yükle"
+                                                >
+                                                    <FiVideo size={12} /> video yükle
+                                                </button>
+
+                                                {/* Video SMS Durumu */}
+                                                {group.videoUrl && (
+                                                    <span style={{
+                                                        fontSize: 10,
+                                                        padding: '4px 8px',
+                                                        borderRadius: 4,
+                                                        fontWeight: 600,
+                                                        background: group.videoSmsSent ? '#dcfce7' : '#fef3c7',
+                                                        color: group.videoSmsSent ? '#15803d' : '#a16207',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 4,
+                                                        whiteSpace: 'nowrap'
+                                                    }}>
+                                                        {group.videoSmsSent ? '✓ VİDEO SMS GİTTİ' : '⏳ VİDEO SMS GİTMEDİ'}
+                                                    </span>
+                                                )}
+
                                                 {!locked && (
                                                     <button
                                                         className="btn btn-xs btn-primary"
@@ -734,6 +766,15 @@ export default function GruplarPage() {
                     currentGroupId={moveRecord.currentGroupId}
                     onClose={() => setMoveRecord(null)}
                     onMoveSuccess={() => setRefreshTrigger(prev => prev + 1)}
+                />
+            )}
+
+            {/* Video Upload Modal */}
+            {videoUploadGroup && (
+                <VideoUploadModal
+                    group={videoUploadGroup}
+                    onClose={() => setVideoUploadGroup(null)}
+                    onSuccess={() => setRefreshTrigger(prev => prev + 1)}
                 />
             )}
 

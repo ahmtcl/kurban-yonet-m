@@ -60,6 +60,8 @@ export interface Group {
     description: string;
     memberIds: string[];
     kesimSiraNo?: number | null;
+    videoUrl?: string | null;
+    videoSmsSent?: boolean;
     createdAt: Date;
 }
 

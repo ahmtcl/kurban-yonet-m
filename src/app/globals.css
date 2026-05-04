@@ -1232,4 +1232,11 @@ tr:last-child td {
     align-items: center;
     gap: 5px;
   }
+
+  /* Video yükleme butonu mobilde daha büyük */
+  .group-card-footer button[title="Video Yükle"] {
+    min-height: 36px;
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+  }
 }
