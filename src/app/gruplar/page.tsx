@@ -40,6 +40,9 @@ export default function GruplarPage() {
     // Group Edit
     const [editingGroup, setEditingGroup] = useState<Group | null>(null);
 
+    // Grupsuzlar daraltma
+    const [unassignedCollapsed, setUnassignedCollapsed] = useState(true);
+
     // Kesim Sıra No State
     const [editingKesimSiraGroupId, setEditingKesimSiraGroupId] = useState<string | null>(null);
     const [kesimSiraInput, setKesimSiraInput] = useState('');
@@ -355,8 +358,8 @@ export default function GruplarPage() {
     return (
         <>
             <div className="top-bar">
-                <h2>👥 Gruplar ve Hissedarlar</h2>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <h2>👥 Gruplar</h2>
+                <div className="top-bar-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: 2 }}>
                     {selectedGroupIds.length > 0 && (
                         <span style={{
                             background: 'var(--accent-primary)',
@@ -409,17 +412,22 @@ export default function GruplarPage() {
 
             <div className="page-content" style={{ paddingBottom: 50 }}>
                 {/* UNASSIGNED SECTION */}
-                <div className="card" style={{ marginBottom: 40, border: '2px dashed var(--accent-primary)', background: '#f0f9ff' }}>
-                    <div style={{ padding: 16, borderBottom: '1px solid #e0f2fe', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h3 style={{ margin: 0, color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                            📌 Gruplandırılmamış Hissedarlar ({unassignedShareholders.length})
+                <div className="card unassigned-section" style={{ marginBottom: 24, border: '2px dashed var(--accent-primary)', background: '#f0f9ff' }}>
+                    <div
+                        style={{ padding: '12px 16px', borderBottom: unassignedCollapsed ? 'none' : '1px solid #e0f2fe', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                        onClick={() => setUnassignedCollapsed(v => !v)}
+                    >
+                        <h3 style={{ margin: 0, color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: 10, fontSize: 14 }}>
+                            <span>{unassignedCollapsed ? '▶' : '▼'}</span>
+                            📌 Grupsuz Hissedarlar ({unassignedShareholders.length})
                         </h3>
                         {selectedUnassignedIds.length > 0 && (
-                            <button className="btn btn-success btn-sm" onClick={() => setShowBulkGroupModal(true)}>
-                                <FiPlus /> Seçilenlerden Grup Oluştur ({selectedUnassignedIds.length})
+                            <button className="btn btn-success btn-sm" onClick={(e) => { e.stopPropagation(); setShowBulkGroupModal(true); }}>
+                                <FiPlus /> Grup Oluştur ({selectedUnassignedIds.length})
                             </button>
                         )}
                     </div>
+                    {!unassignedCollapsed && (
                     <div style={{ padding: 16 }}>
                         <div className="form-group" style={{ maxWidth: 400, marginBottom: 15 }}>
                             <input
@@ -441,11 +449,12 @@ export default function GruplarPage() {
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: 10,
-                                    padding: '8px 12px',
+                                    padding: '10px 12px',
                                     border: '1px solid #e0f2fe',
                                     borderRadius: 6,
                                     background: selectedUnassignedIds.includes(r.id) ? '#dbeffe' : '#fff',
-                                    cursor: 'pointer'
+                                    cursor: 'pointer',
+                                    minHeight: 48,
                                 }}>
                                     <input
                                         type="checkbox"
@@ -454,14 +463,15 @@ export default function GruplarPage() {
                                             if (e.target.checked) setSelectedUnassignedIds([...selectedUnassignedIds, r.id]);
                                             else setSelectedUnassignedIds(selectedUnassignedIds.filter(id => id !== r.id));
                                         }}
+                                        style={{ width: 18, height: 18, flexShrink: 0 }}
                                     />
-                                    <div style={{ overflow: 'hidden' }}>
+                                    <div style={{ overflow: 'hidden', flex: 1 }}>
                                         <div style={{ fontWeight: 600, fontSize: 13, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{r.ownerName}</div>
                                         <div style={{ fontSize: 11, color: '#666' }}>{r.shareTypeName}</div>
                                     </div>
                                     <button
                                         className="btn btn-icon btn-ghost btn-sm"
-                                        style={{ marginLeft: 'auto', padding: 2 }}
+                                        style={{ marginLeft: 'auto', padding: 6, flexShrink: 0 }}
                                         onClick={(e) => { e.preventDefault(); setEditRecord(r); }}
                                     >
                                         <FiEdit />
@@ -475,6 +485,7 @@ export default function GruplarPage() {
                             )}
                         </div>
                     </div>
+                    )}
                 </div>
 
                 {groupsByShareType.map(({ shareType, groups: typeGroups, stats }) => (
@@ -500,7 +511,7 @@ export default function GruplarPage() {
                             </div>
                         </div>
 
-                        <div style={{
+                        <div className="groups-grid" style={{
                             display: 'grid',
                             gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))',
                             gap: 20
@@ -514,9 +525,9 @@ export default function GruplarPage() {
                                 const locked = isGroupLocked(group);
 
                                 return (
-                                    <div key={group.id} className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                    <div key={group.id} className="card group-card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                                         {/* Group Header */}
-                                        <div style={{
+                                        <div className="group-card-header" style={{
                                             padding: '12px 16px',
                                             background: selectedGroupIds.includes(group.id) ? '#1a5276' : '#2c3e50',
                                             color: '#fff',
@@ -563,28 +574,28 @@ export default function GruplarPage() {
                                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                                 <tbody>
                                                     {members.map((member) => (
-                                                        <tr key={member.id} style={{ borderBottom: '1px solid #eee' }}>
-                                                            <td style={{ padding: '8px 12px', fontSize: 14, fontWeight: 500 }}>
+                                                        <tr key={member.id} className="group-member-row" style={{ borderBottom: '1px solid #eee' }}>
+                                                            <td className="group-member-name" style={{ padding: '10px 12px', fontSize: 14, fontWeight: 500 }}>
                                                                 {member.ownerName}
                                                             </td>
-                                                            <td style={{ width: 180, padding: '4px' }}>
+                                                            <td className="group-member-actions" style={{ width: 150, padding: '4px 8px' }}>
                                                                 <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
                                                                     <button
                                                                         className="btn btn-xs btn-ghost"
                                                                         onClick={() => setEditRecord(member)}
                                                                         title="Düzenle"
-                                                                        style={{ fontSize: 11, padding: '2px 6px', border: '1px solid #ddd' }}
+                                                                        style={{ fontSize: 11, padding: '2px 6px', border: '1px solid #ddd', display: 'flex', alignItems: 'center', gap: 3 }}
                                                                     >
-                                                                        Düzenle
+                                                                        <FiEdit size={11} /><span className="member-btn-label">Düzenle</span>
                                                                     </button>
                                                                     {!locked && (
                                                                         <button
                                                                             className="btn btn-xs btn-ghost"
                                                                             onClick={() => setDeleteConfirm({ groupId: group.id, recordId: member.id })}
                                                                             title="Gruptan Çıkar"
-                                                                            style={{ fontSize: 11, padding: '2px 6px', border: '1px solid #ddd', color: 'var(--accent-danger)' }}
+                                                                            style={{ fontSize: 11, padding: '2px 6px', border: '1px solid #ddd', color: 'var(--accent-danger)', display: 'flex', alignItems: 'center', gap: 3 }}
                                                                         >
-                                                                            Sil
+                                                                            <FiTrash2 size={11} /><span className="member-btn-label">Sil</span>
                                                                         </button>
                                                                     )}
                                                                     {/* Move Button - Only if Enabled in Settings AND group not locked */}
@@ -593,9 +604,9 @@ export default function GruplarPage() {
                                                                             className="btn btn-xs btn-ghost"
                                                                             onClick={() => setMoveRecord({ record: member, currentGroupId: group.id })}
                                                                             title="Başka Gruba Taşı"
-                                                                            style={{ fontSize: 11, padding: '2px 6px', border: '1px solid #ddd', color: 'var(--accent-primary)' }}
+                                                                            style={{ fontSize: 11, padding: '2px 6px', border: '1px solid #ddd', color: 'var(--accent-primary)', display: 'flex', alignItems: 'center', gap: 3 }}
                                                                         >
-                                                                            Taşı
+                                                                            <FiX size={11} style={{ transform: 'rotate(45deg)' }} /><span className="member-btn-label">Taşı</span>
                                                                         </button>
                                                                     )}
                                                                 </div>
@@ -613,14 +624,16 @@ export default function GruplarPage() {
                                         </div>
 
                                         {/* Group Description Footer */}
-                                        <div style={{
-                                            padding: '8px 16px',
+                                        <div className="group-card-footer" style={{
+                                            padding: '10px 16px',
                                             background: '#f8f9fa',
                                             borderTop: '1px solid #eee',
                                             display: 'flex',
                                             justifyContent: 'space-between',
                                             alignItems: 'center',
-                                            minHeight: 45
+                                            minHeight: 48,
+                                            flexWrap: 'wrap',
+                                            gap: 8,
                                         }}>
                                             {/* Kesim Sıra No */}
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
