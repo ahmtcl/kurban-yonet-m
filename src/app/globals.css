@@ -1055,9 +1055,6 @@ tr:last-child td {
   }
 }
 
-  }
-}
-
 /* 400px altı ekranlar */
 @media (max-width: 400px) {
   .top-bar h2 {
