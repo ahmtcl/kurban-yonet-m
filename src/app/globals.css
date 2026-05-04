@@ -1236,4 +1236,9 @@ tr:last-child td {
     padding: 6px 10px !important;
     font-size: 12px !important;
   }
+
+  /* Video link gösterimi mobilde */
+  .group-card-footer > div[style*="Video Linki"] {
+    padding: 10px !important;
+  }
 }

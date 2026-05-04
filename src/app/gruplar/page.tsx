@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FiEdit, FiTrash2, FiPlus, FiSettings, FiX, FiDownload, FiCheckSquare, FiSquare, FiHash, FiLock, FiVideo, FiSend } from 'react-icons/fi';
+import { FiEdit, FiTrash2, FiPlus, FiSettings, FiX, FiDownload, FiCheckSquare, FiSquare, FiHash, FiLock, FiVideo, FiSend, FiCopy } from 'react-icons/fi';
 import { getGroups, getShareTypes, getRecords, removeMemberFromGroup, updateRecord, updateGroup, deleteGroup, getSettings } from '@/lib/firestore';
 import type { Group, ShareType, Record } from '@/types';
 import RecordEditModal from '@/components/modals/RecordEditModal';
@@ -686,6 +686,57 @@ export default function GruplarPage() {
                                                     </div>
                                                 )}
                                             </div>
+
+                                            {/* Video Link Gösterimi */}
+                                            {group.videoUrl && (
+                                                <div style={{
+                                                    width: '100%',
+                                                    marginTop: 8,
+                                                    padding: '8px 10px',
+                                                    background: '#f0f9ff',
+                                                    border: '1px solid #bae6fd',
+                                                    borderRadius: 4,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 8,
+                                                    flexWrap: 'wrap'
+                                                }}>
+                                                    <div style={{ flex: 1, minWidth: 200 }}>
+                                                        <div style={{ fontSize: 11, color: '#0369a1', fontWeight: 600, marginBottom: 4 }}>
+                                                            📹 Video Linki
+                                                        </div>
+                                                        <div style={{
+                                                            fontSize: 11,
+                                                            color: '#0c4a6e',
+                                                            wordBreak: 'break-all',
+                                                            maxWidth: 400
+                                                        }}>
+                                                            {group.videoUrl.length > 60
+                                                                ? `${group.videoUrl.substring(0, 60)}...`
+                                                                : group.videoUrl
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        className="btn btn-xs btn-ghost"
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(group.videoUrl || '');
+                                                            alert('Video linki kopyalandı!');
+                                                        }}
+                                                        style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: 4,
+                                                            fontSize: 11,
+                                                            padding: '4px 8px',
+                                                            border: '1px solid #0ea5e9'
+                                                        }}
+                                                    >
+                                                        <FiCopy size={12} /> Link Kopyala
+                                                    </button>
+                                                </div>
+                                            )}
+
                                             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                                                 {/* Video Yükle */}
                                                 <button

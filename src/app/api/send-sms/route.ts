@@ -2,52 +2,100 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
     try {
-        const { phone, message } = await request.json();
+        const body = await request.json();
+        const { phone, message, recipients, messageType, groupName } = body;
 
-        // Basic validation
-        if (!phone || !message) {
-            return NextResponse.json({ success: false, error: 'Phone and message are required' }, { status: 400 });
-        }
-
-        // NetGSM XML Structure
+        // NetGSM Credentials
         const usercode = process.env.NETGSM_USERCODE;
         const password = process.env.NETGSM_PASSWORD;
         const msgheader = process.env.NETGSM_HEADER;
 
-        // Sanitize credentials
         const cleanUsercode = usercode?.trim().replace(/"/g, '') || '';
         const cleanPassword = password?.trim().replace(/"/g, '') || '';
         const cleanHeader = msgheader?.trim().replace(/"/g, '') || '';
 
+        // Toplu SMS Gönderimi (Video SMS)
+        if (recipients && Array.isArray(recipients) && messageType === 'video') {
+            const results = [];
+            
+            for (const recipient of recipients) {
+                const { phone, name, videoUrl } = recipient;
+                
+                // SMS metni oluştur
+                const smsMessage = `SAYIN ${name.toUpperCase()} KURBANINIZ KESILMISTIR. ALLAH KABUL ETSIN. KURBAN KESIM VIDEONUZU LINK UZERINDEN IZLEYEBILIRSINIZ. ${videoUrl}`;
+                
+                const apiUrl = `https://api.netgsm.com.tr/sms/send/get/`;
+                const params = new URLSearchParams({
+                    usercode: cleanUsercode,
+                    password: cleanPassword,
+                    msgheader: cleanHeader,
+                    gsmno: phone,
+                    message: smsMessage,
+                    dil: 'TR'
+                });
+
+                try {
+                    const response = await fetch(`${apiUrl}?${params.toString()}`, {
+                        method: 'GET'
+                    });
+
+                    const responseText = await response.text();
+                    const code = responseText.trim().substring(0, 2);
+
+                    results.push({
+                        phone,
+                        name,
+                        success: code === '00',
+                        response: responseText
+                    });
+
+                    // API rate limit için kısa bekleme
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                } catch (error) {
+                    results.push({
+                        phone,
+                        name,
+                        success: false,
+                        error: 'SMS gönderilemedi'
+                    });
+                }
+            }
+
+            const successCount = results.filter(r => r.success).length;
+            return NextResponse.json({
+                success: successCount > 0,
+                totalSent: successCount,
+                totalFailed: results.length - successCount,
+                results
+            });
+        }
+
+        // Tekli SMS Gönderimi (Eski format - geriye dönük uyumluluk)
+        if (!phone || !message) {
+            return NextResponse.json({ success: false, error: 'Phone and message are required' }, { status: 400 });
+        }
+
         console.log('Credentials Lengths - User:', cleanUsercode.length, 'Pass:', cleanPassword.length, 'Header:', cleanHeader.length);
 
-        // NetGSM GET API URL (Ensuring trailing slash as per some docs)
         const apiUrl = `https://api.netgsm.com.tr/sms/send/get/`;
         const params = new URLSearchParams({
             usercode: cleanUsercode,
             password: cleanPassword,
             msgheader: cleanHeader,
-            gsmno: phone, // Changed from 'mobiles' to 'gsmno'
+            gsmno: phone,
             message: message,
-            dil: 'TR' // Added for Turkish character support
+            dil: 'TR'
         });
 
-        // Send request to NetGSM
         const fullUrl = `${apiUrl}?${params.toString()}`;
         console.log('NetGSM Params:', params.toString());
-        // console.log('NetGSM Request URL (masked):', fullUrl.replace(cleanPassword, '*****'));
 
         const response = await fetch(fullUrl, {
             method: 'GET'
         });
 
         const responseText = await response.text();
-
         console.log('NetGSM Response:', responseText);
-
-        // NetGSM Error Handling
-        // Success response usually starts with "00" followed by JobID (e.g. "00 123456")
-        // Error codes are usually just 2 digits (e.g. "40", "30")
 
         const code = responseText.trim().substring(0, 2);
 
@@ -67,12 +115,10 @@ export async function POST(request: Request) {
             });
         }
 
-        // If it starts with 00, it's success
         if (code === '00') {
             return NextResponse.json({ success: true, apiResponse: responseText });
         }
 
-        // Fallback for other responses
         return NextResponse.json({ success: true, apiResponse: responseText, warning: 'Unrecognized response format' });
 
     } catch (error) {
