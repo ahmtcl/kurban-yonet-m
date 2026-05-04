@@ -223,7 +223,6 @@ export default function VideoUploadModal({ group, onClose, onSuccess }: Props) {
                             ref={fileInputRef}
                             type="file"
                             accept="video/*"
-                            capture="environment"
                             onChange={handleFileSelect}
                             style={{ display: 'none' }}
                         />
