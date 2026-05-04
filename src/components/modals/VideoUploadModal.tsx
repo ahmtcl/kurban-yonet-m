@@ -17,6 +17,7 @@ export default function VideoUploadModal({ group, onClose, onSuccess }: Props) {
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [uploadSuccess, setUploadSuccess] = useState(false);
+    const [uploadedVideoUrl, setUploadedVideoUrl] = useState<string | null>(null);
     const [sendingSms, setSendingSms] = useState(false);
     const [members, setMembers] = useState<Record[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -90,8 +91,14 @@ export default function VideoUploadModal({ group, onClose, onSuccess }: Props) {
             console.log('✅ Firestore güncellendi');
 
             setUploadSuccess(true);
-            alert('✓ Video başarıyla yüklendi!');
+            setUploadedVideoUrl(downloadURL);
+            setSelectedFile(null);
+            setPreviewUrl(null);
+            
+            // Grup bilgisini güncelle (parent'ı refresh et)
             onSuccess();
+            
+            // MODAL AÇIK KALSIN - SMS gönderilebilsin
         } catch (error: any) {
             console.error('❌ Video yükleme hatası:', error);
             console.error('Hata detayı:', error.code, error.message);
@@ -103,7 +110,9 @@ export default function VideoUploadModal({ group, onClose, onSuccess }: Props) {
     };
 
     const handleSendSms = async () => {
-        if (!group.videoUrl) {
+        const videoUrl = uploadedVideoUrl || group.videoUrl;
+        
+        if (!videoUrl) {
             alert('Video yüklenmeden SMS gönderilemez!');
             return;
         }
@@ -122,7 +131,7 @@ export default function VideoUploadModal({ group, onClose, onSuccess }: Props) {
                     recipients: members.map(m => ({
                         phone: m.phone,
                         name: m.ownerName,
-                        videoUrl: group.videoUrl
+                        videoUrl: videoUrl
                     })),
                     messageType: 'video',
                     groupName: group.name
@@ -312,7 +321,7 @@ export default function VideoUploadModal({ group, onClose, onSuccess }: Props) {
                 </div>
 
                 <div className="modal-footer" style={{ display: 'flex', gap: 8, justifyContent: 'space-between', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         {selectedFile && !uploading && !uploadSuccess && (
                             <button
                                 className="btn btn-success"
@@ -322,7 +331,7 @@ export default function VideoUploadModal({ group, onClose, onSuccess }: Props) {
                                 <FiUpload /> Videoyu Yükle
                             </button>
                         )}
-                        {group.videoUrl && !group.videoSmsSent && (
+                        {(uploadSuccess || (group.videoUrl && !group.videoSmsSent)) && (
                             <button
                                 className="btn"
                                 onClick={handleSendSms}
