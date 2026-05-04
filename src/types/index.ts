@@ -78,6 +78,8 @@ export interface Settings {
     newRecordSmsEnabled: boolean;
     newRecordSmsNumbers: string; // Comma-separated phone numbers
     newRecordSmsTemplate: string; // Template with {SIPARIS_NO}, {HISSE_TIPI}, {AD_SOYAD}
+    groupsLockedDay1: boolean;
+    groupsLockedDay2: boolean;
 }
 
 export interface DashboardStats {

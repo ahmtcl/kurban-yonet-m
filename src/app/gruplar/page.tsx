@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FiEdit, FiTrash2, FiPlus, FiSettings, FiX, FiDownload, FiCheckSquare, FiSquare, FiHash } from 'react-icons/fi';
+import { FiEdit, FiTrash2, FiPlus, FiSettings, FiX, FiDownload, FiCheckSquare, FiSquare, FiHash, FiLock } from 'react-icons/fi';
 import { getGroups, getShareTypes, getRecords, removeMemberFromGroup, updateRecord, updateGroup, deleteGroup, getSettings } from '@/lib/firestore';
 import type { Group, ShareType, Record } from '@/types';
 import RecordEditModal from '@/components/modals/RecordEditModal';
@@ -326,6 +326,16 @@ export default function GruplarPage() {
         XLSX.writeFile(wb, fileName);
     }
 
+    // Kilit kontrol yardımcısı (admin her zaman serbest)
+    function isGroupLocked(group: Group): boolean {
+        if (isAdmin) return false;
+        const firstMember = records.find(r => group.memberIds.includes(r.id));
+        const day = firstMember?.daySelection ?? null;
+        if (day === 1) return settings?.groupsLockedDay1 ?? false;
+        if (day === 2) return settings?.groupsLockedDay2 ?? false;
+        return false;
+    }
+
     // Grouping logic
     const groupsByShareType = shareTypes.map(st => {
         const typeGroups = groups.filter(g => g.shareTypeId === st.id);
@@ -501,9 +511,7 @@ export default function GruplarPage() {
                                     .map(id => records.find(r => r.id === id))
                                     .filter(r => !!r) as Record[];
 
-                                // Fill empty slots if less than 7 (standard cow share) - just for visual consistency if needed
-                                // or just show existing.
-                                // Mockup shows standard table rows. 
+                                const locked = isGroupLocked(group);
 
                                 return (
                                     <div key={group.id} className="card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -534,13 +542,20 @@ export default function GruplarPage() {
                                                     </div>
                                                 </div>
                                             </label>
-                                            <button
-                                                className="btn btn-icon btn-sm btn-ghost"
-                                                style={{ color: '#fff', opacity: 0.8 }}
-                                                onClick={() => setEditingGroup(group)}
-                                            >
-                                                <FiSettings />
-                                            </button>
+                                            {locked && (
+                                                <span title="Bu grup kilitlenmiştir" style={{ color: '#fbbf24', display: 'flex', alignItems: 'center' }}>
+                                                    <FiLock size={16} />
+                                                </span>
+                                            )}
+                                            {!locked && (
+                                                <button
+                                                    className="btn btn-icon btn-sm btn-ghost"
+                                                    style={{ color: '#fff', opacity: 0.8 }}
+                                                    onClick={() => setEditingGroup(group)}
+                                                >
+                                                    <FiSettings />
+                                                </button>
+                                            )}
                                         </div>
 
                                         {/* Members Table */}
@@ -562,17 +577,18 @@ export default function GruplarPage() {
                                                                     >
                                                                         Düzenle
                                                                     </button>
-                                                                    <button
-                                                                        className="btn btn-xs btn-ghost"
-                                                                        onClick={() => setDeleteConfirm({ groupId: group.id, recordId: member.id })}
-                                                                        title="Gruptan Çıkar"
-                                                                        style={{ fontSize: 11, padding: '2px 6px', border: '1px solid #ddd', color: 'var(--accent-danger)' }}
-                                                                    >
-                                                                        Sil
-                                                                    </button>
-
-                                                                    {/* Move Button - Only if Enabled in Settings */}
-                                                                    {settings?.moveButtonEnabled && (
+                                                                    {!locked && (
+                                                                        <button
+                                                                            className="btn btn-xs btn-ghost"
+                                                                            onClick={() => setDeleteConfirm({ groupId: group.id, recordId: member.id })}
+                                                                            title="Gruptan Çıkar"
+                                                                            style={{ fontSize: 11, padding: '2px 6px', border: '1px solid #ddd', color: 'var(--accent-danger)' }}
+                                                                        >
+                                                                            Sil
+                                                                        </button>
+                                                                    )}
+                                                                    {/* Move Button - Only if Enabled in Settings AND group not locked */}
+                                                                    {!locked && settings?.moveButtonEnabled && (
                                                                         <button
                                                                             className="btn btn-xs btn-ghost"
                                                                             onClick={() => setMoveRecord({ record: member, currentGroupId: group.id })}
@@ -654,21 +670,30 @@ export default function GruplarPage() {
                                                 )}
                                             </div>
                                             <div style={{ display: 'flex', gap: 6 }}>
-                                                <button
-                                                    className="btn btn-xs btn-primary"
-                                                    style={{ fontSize: 12, padding: '4px 8px' }}
-                                                    onClick={() => setAddMemberGroup(group)}
-                                                >
-                                                    <FiPlus /> Üye Ekle
-                                                </button>
-                                                <button
-                                                    className="btn btn-xs"
-                                                    style={{ fontSize: 12, padding: '4px 8px', background: '#7b2d8b', color: '#fff', border: 'none' }}
-                                                    onClick={() => setMergeGroup(group)}
-                                                    title="Bu grupla başka bir grubu birleştir"
-                                                >
-                                                    Birleştir
-                                                </button>
+                                                {!locked && (
+                                                    <button
+                                                        className="btn btn-xs btn-primary"
+                                                        style={{ fontSize: 12, padding: '4px 8px' }}
+                                                        onClick={() => setAddMemberGroup(group)}
+                                                    >
+                                                        <FiPlus /> Üye Ekle
+                                                    </button>
+                                                )}
+                                                {!locked && (
+                                                    <button
+                                                        className="btn btn-xs"
+                                                        style={{ fontSize: 12, padding: '4px 8px', background: '#7b2d8b', color: '#fff', border: 'none' }}
+                                                        onClick={() => setMergeGroup(group)}
+                                                        title="Bu grupla başka bir grubu birleştir"
+                                                    >
+                                                        Birleştir
+                                                    </button>
+                                                )}
+                                                {locked && (
+                                                    <span style={{ fontSize: 12, color: '#ef4444', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+                                                        <FiLock size={13} /> Kilitli
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

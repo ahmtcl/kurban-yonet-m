@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { FiX, FiArrowRight, FiCheck, FiAlertTriangle } from 'react-icons/fi';
-import { getGroups, getRecords, updateRecord, addMemberToGroup, removeMemberFromGroup } from '@/lib/firestore';
+import { getGroups, getRecords, updateRecord, addMemberToGroup, removeMemberFromGroup, getSettings } from '@/lib/firestore';
 import type { Group, Record } from '@/types';
 
 interface MoveToGroupModalProps {
@@ -25,7 +25,7 @@ export default function MoveToGroupModal({ record, currentGroupId, onClose, onMo
 
     async function loadGroups() {
         try {
-            const [res, recs] = await Promise.all([getGroups(), getRecords()]);
+            const [res, recs, sett] = await Promise.all([getGroups(), getRecords(), getSettings()]);
             setAllRecords(recs);
             const compatibleGroups = res.filter(g => {
                 if (g.id === currentGroupId) return false;
@@ -36,6 +36,11 @@ export default function MoveToGroupModal({ record, currentGroupId, onClose, onMo
                     const memberDays = g.memberIds.map(mid => recs.find(r => r.id === mid)?.daySelection).filter(Boolean);
                     if (memberDays.length > 0 && memberDays[0] !== record.daySelection) return false;
                 }
+                // Kilitli grup kontrolü
+                const firstMember = recs.find(r => g.memberIds.includes(r.id));
+                const gDay = firstMember?.daySelection ?? record.daySelection;
+                if (gDay === 1 && sett.groupsLockedDay1) return false;
+                if (gDay === 2 && sett.groupsLockedDay2) return false;
                 return true;
             });
             setGroups(compatibleGroups);

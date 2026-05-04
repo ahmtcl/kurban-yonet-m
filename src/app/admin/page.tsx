@@ -507,6 +507,56 @@ export default function AdminPage() {
                                     <FiSave /> {saving ? 'Kaydediliyor...' : 'Ayarları Kaydet'}
                                 </button>
 
+                                {/* GRUP KİLİTLEME */}
+                                <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 22, marginBottom: 28 }}>
+                                    <h3 style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8, fontSize: 15 }}>
+                                        <FiLock /> Grup Kilitleme
+                                    </h3>
+                                    <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 18 }}>
+                                        Kilitlenen günlerin gruplarında kullanıcılar (admin hariç) kişi ekleme/çıkarma, silme, düzenleme ve taşıma yapamaz.
+                                    </p>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+                                        {([1, 2] as const).map(d => {
+                                            const locked = d === 1 ? settings.groupsLockedDay1 : settings.groupsLockedDay2;
+                                            const toggle = async () => {
+                                                const key = d === 1 ? 'groupsLockedDay1' : 'groupsLockedDay2';
+                                                const newVal = !locked;
+                                                setSettings({ ...settings, [key]: newVal });
+                                                await updateSettings({ [key]: newVal });
+                                            };
+                                            return (
+                                                <div key={d} style={{
+                                                    display: 'flex', alignItems: 'center', gap: 14,
+                                                    background: locked ? '#fef2f2' : '#f0fdf4',
+                                                    border: `1.5px solid ${locked ? '#fca5a5' : '#86efac'}`,
+                                                    borderRadius: 10, padding: '12px 20px', minWidth: 220,
+                                                }}>
+                                                    <FiLock size={20} color={locked ? '#ef4444' : '#22c55e'} />
+                                                    <div style={{ flex: 1 }}>
+                                                        <div style={{ fontWeight: 700, fontSize: 14, color: '#111' }}>
+                                                            {d}. Gün Grupları
+                                                        </div>
+                                                        <div style={{ fontSize: 12, color: locked ? '#ef4444' : '#16a34a', fontWeight: 600 }}>
+                                                            {locked ? 'KİLİTLİ' : 'AÇIK'}
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={toggle}
+                                                        style={{
+                                                            padding: '6px 16px', borderRadius: 7, border: 'none', cursor: 'pointer',
+                                                            background: locked ? '#ef4444' : '#22c55e',
+                                                            color: '#fff', fontWeight: 700, fontSize: 13,
+                                                            transition: 'background .15s',
+                                                        }}
+                                                    >
+                                                        {locked ? 'Kilidi Aç' : 'Kilitle'}
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
                                 <div style={{ borderTop: '1px solid #eee', paddingTop: 20 }}>
                                     <h3 style={{ marginBottom: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
                                         <FiMessageSquare /> SMS Şablonları Yönetimi

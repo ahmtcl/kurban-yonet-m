@@ -291,6 +291,8 @@ export async function getSettings(): Promise<Settings> {
             newRecordSmsEnabled: d.newRecordSmsEnabled ?? false,
             newRecordSmsNumbers: d.newRecordSmsNumbers || '',
             newRecordSmsTemplate: d.newRecordSmsTemplate || '',
+            groupsLockedDay1: d.groupsLockedDay1 ?? false,
+            groupsLockedDay2: d.groupsLockedDay2 ?? false,
         };
 }
 
