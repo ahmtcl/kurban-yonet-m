@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import QRCode from 'qrcode';
 import type { Record, Settings, Group, ShareType, VekaletSession } from '@/types';
 
 // Ozet: Roboto-Regular base64 font data for Turkish support
@@ -262,40 +263,34 @@ export const generateKesimListesiPDF = async (
 
     // ---- Ortak header çizici ----
     const drawHeader = (shareTypeName?: string): number => {
-        let y = margin;
+        let y = margin + 2; // Üstten biraz boşluk ekle
 
         if (logoBase64) {
-            const lw = 22;
-            const lh = Math.min(lw * logoRatio, 16);
+            const lw = 50; // Logo boyutu büyütüldü (22 → 50mm)
+            const lh = Math.min(lw * logoRatio, 45); // Maksimum yükseklik artırıldı (30 → 45mm)
             doc.addImage(logoBase64, 'PNG', (W - lw) / 2, y, lw, lh);
-            y += lh + 3;
+            y += lh + 6; // Alttan daha fazla boşluk (4 → 6mm)
         }
 
-        if (companyName) {
-            doc.setFont(font, 'bold');
-            doc.setFontSize(13);
-            doc.setTextColor(0);
-            doc.text(companyName, W / 2, y, { align: 'center' });
-            y += 6;
-        }
+        // Firma ünvanı kaldırıldı (kullanıcı isteği)
 
         doc.setFont(font, 'normal');
-        doc.setFontSize(10);
+        doc.setFontSize(11);
         doc.setTextColor(0);
         doc.text(`${year} KURBAN BAYRAMI`, W / 2, y, { align: 'center' });
-        y += 5;
+        y += 6;
 
         if (shareTypeName) {
             doc.setFont(font, 'bold');
-            doc.setFontSize(10);
+            doc.setFontSize(11);
             doc.text(shareTypeName.toUpperCase(), W / 2, y, { align: 'center' });
-            y += 5;
+            y += 6;
         }
 
         doc.setDrawColor(0);
         doc.setLineWidth(0.6);
         doc.line(margin, y, W - margin, y);
-        y += 5;
+        y += 6;
 
         return y;
     };
@@ -374,44 +369,44 @@ export const generateKesimListesiPDF = async (
 
             // KESİM SIRASI etiketi
             doc.setFont(font, 'normal');
-            doc.setFontSize(9);
+            doc.setFontSize(10);
             doc.setTextColor(80, 80, 80);
             doc.text('KESİM SIRASI', W / 2, y, { align: 'center' });
-            y += 3;
+            y += 4;
 
             // Kutu + numara
-            const boxW = 30;
-            const boxH = 22;
+            const boxW = 35;
+            const boxH = 24;
             const boxX = (W - boxW) / 2;
             doc.setDrawColor(0);
             doc.setLineWidth(1.2);
             doc.setFillColor(255, 255, 255);
             doc.rect(boxX, y, boxW, boxH, 'FD');
             doc.setFont(font, 'bold');
-            doc.setFontSize(22);
+            doc.setFontSize(24);
             doc.setTextColor(0);
             doc.text(String(group.kesimSiraNo ?? '-'), W / 2, y + boxH * 0.68, { align: 'center' });
-            y += boxH + 6;
+            y += boxH + 8;
 
-            // Üye listesi (7 satır)
+            // Üye listesi (7 satır) - Font ve satır yükseklikleri artırıldı
             for (let i = 0; i < 7; i++) {
                 const member = members[i];
                 if (i % 2 === 0) {
                     doc.setFillColor(246, 246, 246);
-                    doc.rect(margin, y - 3.8, cW, 8.2, 'F');
+                    doc.rect(margin, y - 4.5, cW, 12, 'F');
                 }
                 doc.setFont(font, 'bold');
-                doc.setFontSize(9);
+                doc.setFontSize(11);
                 doc.setTextColor(100, 100, 100);
-                doc.text(String(i + 1), margin + 1.5, y);
+                doc.text(String(i + 1), margin + 2, y);
 
                 if (member) {
                     doc.setFont(font, 'normal');
-                    doc.setFontSize(10);
+                    doc.setFontSize(13); // Font boyutu artırıldı (10 → 13pt)
                     doc.setTextColor(0);
-                    doc.text(member.ownerName, margin + 9, y);
+                    doc.text(member.ownerName, margin + 10, y);
                 }
-                y += 8.5;
+                y += 12; // Satır yüksekliği artırıldı (8.5 → 12mm)
             }
         });
     }
@@ -429,10 +424,11 @@ export const generateEtiketPDF = async (
     day: 1 | 2 | 3,
     singleGroupId?: string, // tanımlıysa sadece o grup basılır
 ) => {
-    // 10×10 cm = 100×100 mm
+    // 10×10 cm = 100×100 mm (her etiket boyutu)
     const W = 100;
     const H = 100;
 
+    // Her etiket kendi sayfasında (100×100 mm)
     const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
@@ -479,8 +475,17 @@ export const generateEtiketPDF = async (
         return '3. GÜN';
     };
 
-    targetGroups.forEach((group, idx) => {
-        if (idx > 0) doc.addPage([W, H]);
+    // İlk sayfayı kaldır (döngü içinde eklenecek)
+    doc.deletePage(1);
+
+    // forEach yerine for...of kullan (async/await için)
+    for (let idx = 0; idx < targetGroups.length; idx++) {
+        const group = targetGroups[idx];
+
+        // HER GRUP İÇİN 14 KOPYA OLUŞTUR (7 koli × 2 yüz = 14 etiket)
+        for (let copyIndex = 0; copyIndex < 14; copyIndex++) {
+            // Her etiket için yeni sayfa ekle (100×100 mm)
+            doc.addPage([W, H], 'portrait');
 
         const shareType  = shareTypes.find(st => st.id === group.shareTypeId);
         const stName     = shareType?.name || group.shareTypeName || '';
@@ -543,9 +548,10 @@ export const generateEtiketPDF = async (
         // ── ÜYELER TABLOSU ──
         const rowH    = 7.5;
         const noColW  = 8;
-        const nameColW = innerW - noColW - 2; // QR için sağda yer bırak
-        const qrColW  = 18;
-        const tableW  = noColW + (nameColW - qrColW);
+        const qrSize  = 26; // QR kodu KARE formatında (26×26 mm)
+        const qrColW  = qrSize;
+        const nameColW = innerW - noColW - qrColW - 3; // İsim sütunu daraltıldı
+        const tableW  = noColW + nameColW;
         const tableX  = margin + 1;
 
         // Tablo dış çerçevesi
@@ -575,30 +581,72 @@ export const generateEtiketPDF = async (
             // İsim
             if (member) {
                 doc.setFont(font, 'normal');
-                doc.setFontSize(8.5);
+                doc.setFontSize(7.5); // Font biraz küçültüldü (8.5 → 7.5)
                 doc.setTextColor(0);
-                const nameText = doc.splitTextToSize(member.ownerName, tableW - noColW - 2);
+                const nameText = doc.splitTextToSize(member.ownerName, nameColW - 3);
                 doc.text(nameText[0], tableX + noColW + 2, rowY + rowH * 0.68);
             }
         }
 
-        // ── QR PLACEHOLDER (sağ alt) ──
-        const qrX = margin + innerW - qrColW - 1;
-        const qrY = y;
-        const qrSize = rowH * 7;
-        doc.setLineWidth(0.5);
-        doc.setDrawColor(180, 180, 180);
-        doc.rect(qrX, qrY, qrColW, qrSize);
+        // ── QR KOD (sağ alt) ──
+        const qrX = margin + innerW - qrSize - 1;
+        const qrY = y + (rowH * 7 - qrSize) / 2; // Dikey ortala
 
-        // Placeholder yazısı
-        doc.setFont(font, 'normal');
-        doc.setFontSize(5.5);
-        doc.setTextColor(160, 160, 160);
-        doc.text('QR', qrX + qrColW / 2, qrY + qrSize / 2, { align: 'center' });
-        doc.text('KOD', qrX + qrColW / 2, qrY + qrSize / 2 + 4, { align: 'center' });
+        // Video URL varsa QR kod üret
+        if (group.videoUrl) {
+            try {
+                // QR kod'u base64 image olarak üret (KARE ve YÜKSEK KALİTE)
+                const qrDataUrl = await QRCode.toDataURL(group.videoUrl, {
+                    width: 400,  // Yüksek çözünürlük
+                    margin: 0,   // Kenardan boşluk yok
+                    errorCorrectionLevel: 'H',  // Yüksek seviye hata düzeltme
+                    color: {
+                        dark: '#000000',
+                        light: '#FFFFFF'
+                    }
+                });
+
+                // QR kod'u PDF'e KARE olarak ekle (26×26 mm)
+                doc.addImage(qrDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
+                
+                // QR etrafına ince çerçeve
+                doc.setLineWidth(0.3);
+                doc.setDrawColor(0);
+                doc.rect(qrX, qrY, qrSize, qrSize);
+
+                // QR altına açıklama metni
+                doc.setFont(font, 'bold');
+                doc.setFontSize(4.5);
+                doc.setTextColor(0, 0, 0);
+                doc.text('VİDEO İÇİN', qrX + qrSize / 2, qrY + qrSize + 2.5, { align: 'center' });
+                doc.text('QR OKUTUNUZ', qrX + qrSize / 2, qrY + qrSize + 5, { align: 'center' });
+            } catch (error) {
+                console.error('QR kod üretilemedi:', error);
+                // Hata durumunda placeholder göster
+                doc.setLineWidth(0.3);
+                doc.setDrawColor(0);
+                doc.rect(qrX, qrY, qrSize, qrSize);
+                doc.setFont(font, 'normal');
+                doc.setFontSize(5.5);
+                doc.setTextColor(160, 160, 160);
+                doc.text('QR', qrX + qrSize / 2, qrY + qrSize / 2, { align: 'center' });
+                doc.text('HATA', qrX + qrSize / 2, qrY + qrSize / 2 + 4, { align: 'center' });
+            }
+        } else {
+            // Video yoksa placeholder göster
+            doc.setLineWidth(0.3);
+            doc.setDrawColor(0);
+            doc.rect(qrX, qrY, qrSize, qrSize);
+            doc.setFont(font, 'normal');
+            doc.setFontSize(5.5);
+            doc.setTextColor(160, 160, 160);
+            doc.text('QR', qrX + qrSize / 2, qrY + qrSize / 2, { align: 'center' });
+            doc.text('KOD', qrX + qrSize / 2, qrY + qrSize / 2 + 4, { align: 'center' });
+        }
 
         doc.setDrawColor(0); // reset
-    });
+        } // copyIndex döngüsü sonu (14 kopya)
+    } // targetGroups döngüsü sonu
 
     const dayStr  = singleGroupId ? 'tek' : `gun${day}`;
     const dateStr = new Date().toLocaleDateString('tr-TR').replace(/\./g, '-');

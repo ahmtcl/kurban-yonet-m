@@ -192,6 +192,8 @@ export async function getGroups(): Promise<Group[]> {
         description: d.data().description || '',
         memberIds: d.data().memberIds || [],
         kesimSiraNo: d.data().kesimSiraNo ?? null,
+        videoUrl: d.data().videoUrl ?? null,
+        videoSmsSent: d.data().videoSmsSent ?? false,
         createdAt: d.data().createdAt?.toDate?.() || new Date(),
     }));
 }

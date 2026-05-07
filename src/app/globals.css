@@ -1208,6 +1208,16 @@ tr:last-child td {
     justify-content: center;
   }
 
+  /* WhatsApp butonu mobilde yeşil kalsın */
+  .group-member-actions .btn-xs[style*="background: rgb(37, 211, 102)"] {
+    background: #25D366 !important;
+  }
+
+  /* WhatsApp butonu disabled ise gri kalsın */
+  .group-member-actions .btn-xs[style*="background: rgb(149, 165, 166)"] {
+    background: #95a5a6 !important;
+  }
+
   /* Grup footer butonları tam genişlik */
   .group-card-footer {
     flex-direction: column !important;
@@ -1240,5 +1250,20 @@ tr:last-child td {
   /* Video link gösterimi mobilde */
   .group-card-footer > div[style*="Video Linki"] {
     padding: 10px !important;
+  }
+
+  /* Video Preview Modal - Mobil Optimizasyon */
+  .modal video {
+    max-height: 60vh !important;
+  }
+}
+
+/* Spinner Animasyonu */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
   }
 }

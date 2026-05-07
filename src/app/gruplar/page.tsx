@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FiEdit, FiTrash2, FiPlus, FiSettings, FiX, FiDownload, FiCheckSquare, FiSquare, FiHash, FiLock, FiVideo, FiSend, FiCopy } from 'react-icons/fi';
+import { FiEdit, FiTrash2, FiPlus, FiSettings, FiX, FiDownload, FiCheckSquare, FiSquare, FiHash, FiLock, FiVideo, FiSend, FiCopy, FiCheck, FiMinus } from 'react-icons/fi';
 import { getGroups, getShareTypes, getRecords, removeMemberFromGroup, updateRecord, updateGroup, deleteGroup, getSettings } from '@/lib/firestore';
 import type { Group, ShareType, Record } from '@/types';
 import RecordEditModal from '@/components/modals/RecordEditModal';
@@ -46,6 +46,13 @@ export default function GruplarPage() {
 
     // Video Upload State
     const [videoUploadGroup, setVideoUploadGroup] = useState<Group | null>(null);
+    const [sendingSmsGroupId, setSendingSmsGroupId] = useState<string | null>(null);
+
+    // Video İstatistik Modal State
+    const [videoStatsModal, setVideoStatsModal] = useState<{
+        type: 'uploaded' | 'not-uploaded' | 'sms-pending' | null;
+        groups: Group[];
+    }>({ type: null, groups: [] });
 
     // Kesim Sıra No State
     const [editingKesimSiraGroupId, setEditingKesimSiraGroupId] = useState<string | null>(null);
@@ -55,10 +62,150 @@ export default function GruplarPage() {
     const [bulkKesimStartNo, setBulkKesimStartNo] = useState('');
 
     useEffect(() => {
+        console.log('🔄 refreshTrigger değişti:', refreshTrigger, '- loadData çağrılıyor');
         loadData();
     }, [refreshTrigger]);
 
+    // Video İstatistikleri Hesapla
+    const videoStats = {
+        uploaded: groups.filter(g => g.videoUrl).length,
+        notUploaded: groups.filter(g => !g.videoUrl).length,
+        smsPending: groups.filter(g => g.videoUrl && !g.videoSmsSent).length
+    };
+
+    // Grup'a scroll + expand fonksiyonu
+    const scrollToGroup = (groupId: string) => {
+        const element = document.getElementById(`group-${groupId}`);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Highlight efekti için geçici style
+            element.style.transition = 'all 0.3s';
+            element.style.transform = 'scale(1.02)';
+            element.style.boxShadow = '0 4px 20px rgba(59, 130, 246, 0.4)';
+            setTimeout(() => {
+                element.style.transform = 'scale(1)';
+                element.style.boxShadow = '';
+            }, 600);
+        }
+    };
+
+    // İstatistik karta tıklayınca modal aç
+    const openVideoStatsModal = (type: 'uploaded' | 'not-uploaded' | 'sms-pending') => {
+        let filteredGroups: Group[] = [];
+        if (type === 'uploaded') {
+            filteredGroups = groups.filter(g => g.videoUrl);
+        } else if (type === 'not-uploaded') {
+            filteredGroups = groups.filter(g => !g.videoUrl);
+        } else if (type === 'sms-pending') {
+            filteredGroups = groups.filter(g => g.videoUrl && !g.videoSmsSent);
+        }
+        setVideoStatsModal({ type, groups: filteredGroups });
+    };
+
+    const closeVideoStatsModal = () => {
+        setVideoStatsModal({ type: null, groups: [] });
+    };
+
+    // SMS Gönderme Fonksiyonu (Grup Kartından)
+    const handleSendGroupSms = async (group: Group) => {
+        if (!group.videoUrl) {
+            alert('❌ Video yüklenmeden SMS gönderilemez!');
+            return;
+        }
+
+        if (group.videoSmsSent) {
+            if (!confirm('Bu gruba SMS zaten gönderilmiş. Tekrar göndermek istiyor musunuz?')) {
+                return;
+            }
+        }
+
+        const groupMembers = records.filter(r => group.memberIds.includes(r.id));
+        
+        if (groupMembers.length === 0) {
+            alert('❌ Grupta üye bulunamadı!');
+            return;
+        }
+
+        if (!confirm(`${group.name} grubundaki ${groupMembers.length} kişiye video SMS gönderilecek. Devam edilsin mi?`)) {
+            return;
+        }
+
+        setSendingSmsGroupId(group.id);
+        try {
+            const response = await fetch('/api/send-sms', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    recipients: groupMembers.map(m => ({
+                        phone: m.phone,
+                        name: m.ownerName,
+                        videoUrl: group.videoUrl
+                    })),
+                    messageType: 'video',
+                    groupName: group.name
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('SMS gönderilemedi');
+            }
+
+            // SMS gönderildi olarak işaretle
+            await updateGroup(group.id, {
+                videoSmsSent: true
+            });
+
+            alert(`✅ ${groupMembers.length} kişiye video SMS başarıyla gönderildi!`);
+            setRefreshTrigger(prev => prev + 1);
+        } catch (error) {
+            console.error('SMS gönderme hatası:', error);
+            alert('❌ Video SMS gönderilemedi. Lütfen tekrar deneyin.');
+        } finally {
+            setSendingSmsGroupId(null);
+        }
+    };
+
+    // WhatsApp Helper Fonksiyonları
+    const formatPhoneForWhatsApp = (phone: string): string => {
+        // Telefon numarasını temizle: boşluk, tire, parantez vb. kaldır
+        const cleaned = phone.replace(/[\s\-\(\)]/g, '');
+        
+        // Eğer 0 ile başlıyorsa, +90 ile değiştir
+        if (cleaned.startsWith('0')) {
+            return '+90' + cleaned.substring(1);
+        }
+        
+        // Eğer 90 ile başlıyorsa +90 ekle
+        if (cleaned.startsWith('90')) {
+            return '+' + cleaned;
+        }
+        
+        // Eğer + ile başlıyorsa olduğu gibi kullan
+        if (cleaned.startsWith('+')) {
+            return cleaned;
+        }
+        
+        // Varsayılan: +90 ekle
+        return '+90' + cleaned;
+    };
+
+    const sendVideoViaWhatsApp = (member: Record, videoUrl: string) => {
+        if (!member.phone) {
+            alert('Bu üyenin telefon numarası kayıtlı değil!');
+            return;
+        }
+
+        const formattedPhone = formatPhoneForWhatsApp(member.phone);
+        const message = `SAYIN ${member.ownerName.toUpperCase()} KURBANINIZ KESİLMİŞTİR. ALLAH KABUL ETSİN. KURBAN KESİM VİDEONUZU LİNK ÜZERİNDEN İZLEYEBİLİRSİNİZ. ${videoUrl}`;
+        const encodedMessage = encodeURIComponent(message);
+        const whatsappUrl = `https://wa.me/${formattedPhone.replace('+', '')}?text=${encodedMessage}`;
+        
+        // Yeni sekmede WhatsApp aç
+        window.open(whatsappUrl, '_blank');
+    };
+
     async function loadData() {
+        console.log('📥 loadData başladı - gruplar Firestore\'dan çekiliyor...');
         setLoading(true);
         try {
             const [grps, types, recs, sett] = await Promise.all([
@@ -67,12 +214,14 @@ export default function GruplarPage() {
                 getRecords(),
                 getSettings()
             ]);
+            console.log('✅ Gruplar yüklendi:', grps.length, 'grup');
+            console.log('🔍 Video URL Debug:', grps.map(g => ({ id: g.id, name: g.name, videoUrl: g.videoUrl, videoSmsSent: g.videoSmsSent })));
             setGroups(grps);
             setShareTypes(types);
             setRecords(recs);
             setSettings(sett);
         } catch (error) {
-            console.error(error);
+            console.error('❌ loadData hatası:', error);
         } finally {
             setLoading(false);
         }
@@ -414,6 +563,108 @@ export default function GruplarPage() {
                 </div>
             </div>
 
+            {/* VİDEO İSTATİSTİK KARTLARI */}
+            <div style={{ 
+                padding: '16px 24px', 
+                background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                borderBottom: '2px solid #bae6fd'
+            }}>
+                <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                    gap: 16,
+                    maxWidth: 1200,
+                    margin: '0 auto'
+                }}>
+                    {/* Video Yüklenen Gruplar */}
+                    <div 
+                        onClick={() => openVideoStatsModal('uploaded')}
+                        style={{
+                            background: '#dcfce7',
+                            border: '2px solid #15803d',
+                            borderRadius: 12,
+                            padding: 16,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            textAlign: 'center'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(21, 128, 61, 0.3)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                        }}
+                    >
+                        <div style={{ fontSize: 32, fontWeight: 700, color: '#15803d', marginBottom: 4 }}>
+                            {videoStats.uploaded}
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#166534', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <FiCheck size={16} /> Video Yüklenen
+                        </div>
+                    </div>
+
+                    {/* Video Yüklenmeyen Gruplar */}
+                    <div 
+                        onClick={() => openVideoStatsModal('not-uploaded')}
+                        style={{
+                            background: '#fee2e2',
+                            border: '2px solid #dc2626',
+                            borderRadius: 12,
+                            padding: 16,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            textAlign: 'center'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(220, 38, 38, 0.3)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                        }}
+                    >
+                        <div style={{ fontSize: 32, fontWeight: 700, color: '#dc2626', marginBottom: 4 }}>
+                            {videoStats.notUploaded}
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#991b1b', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <FiMinus size={16} /> Video Yüklenmeyen
+                        </div>
+                    </div>
+
+                    {/* SMS Bekleyen Gruplar */}
+                    <div 
+                        onClick={() => openVideoStatsModal('sms-pending')}
+                        style={{
+                            background: '#fef3c7',
+                            border: '2px solid #d97706',
+                            borderRadius: 12,
+                            padding: 16,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            textAlign: 'center'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(217, 119, 6, 0.3)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                        }}
+                    >
+                        <div style={{ fontSize: 32, fontWeight: 700, color: '#d97706', marginBottom: 4 }}>
+                            {videoStats.smsPending}
+                        </div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#92400e', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <FiSend size={16} /> SMS Bekleyen
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div className="page-content" style={{ paddingBottom: 50 }}>
                 {/* UNASSIGNED SECTION */}
                 <div className="card unassigned-section" style={{ marginBottom: 24, border: '2px dashed var(--accent-primary)', background: '#f0f9ff' }}>
@@ -529,7 +780,12 @@ export default function GruplarPage() {
                                 const locked = isGroupLocked(group);
 
                                 return (
-                                    <div key={group.id} className="card group-card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                    <div 
+                                        key={group.id} 
+                                        id={`group-${group.id}`}
+                                        className="card group-card" 
+                                        style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+                                    >
                                         {/* Group Header */}
                                         <div className="group-card-header" style={{
                                             padding: '12px 16px',
@@ -564,11 +820,23 @@ export default function GruplarPage() {
                                             )}
                                             {!locked && (
                                                 <button
-                                                    className="btn btn-icon btn-sm btn-ghost"
-                                                    style={{ color: '#fff', opacity: 0.8 }}
+                                                    className="btn btn-icon btn-sm"
+                                                    style={{ 
+                                                        color: '#fff', 
+                                                        background: 'rgba(255,255,255,0.1)',
+                                                        border: '1px solid rgba(255,255,255,0.2)',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                                                    }}
                                                     onClick={() => setEditingGroup(group)}
+                                                    title="Grup Ayarları"
                                                 >
-                                                    <FiSettings />
+                                                    <FiSettings size={18} />
                                                 </button>
                                             )}
                                         </div>
@@ -582,8 +850,34 @@ export default function GruplarPage() {
                                                             <td className="group-member-name" style={{ padding: '10px 12px', fontSize: 14, fontWeight: 500 }}>
                                                                 {member.ownerName}
                                                             </td>
-                                                            <td className="group-member-actions" style={{ width: 150, padding: '4px 8px' }}>
+                                                            <td className="group-member-actions" style={{ width: 220, padding: '4px 8px' }}>
                                                                 <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                                                                    {/* WhatsApp Video Gönder - Her zaman görünür */}
+                                                                    <button
+                                                                        className="btn btn-xs"
+                                                                        onClick={() => {
+                                                                            if (group.videoUrl) {
+                                                                                sendVideoViaWhatsApp(member, group.videoUrl);
+                                                                            } else {
+                                                                                alert('❌ Bu gruba henüz video yüklenmedi! Önce video yükleyin.');
+                                                                            }
+                                                                        }}
+                                                                        title={group.videoUrl ? "WhatsApp'tan Video Gönder" : "Henüz video yüklenmedi"}
+                                                                        style={{ 
+                                                                            fontSize: 11, 
+                                                                            padding: '2px 6px', 
+                                                                            background: group.videoUrl ? '#25D366' : '#95a5a6', 
+                                                                            color: '#fff', 
+                                                                            border: 'none',
+                                                                            display: 'flex', 
+                                                                            alignItems: 'center', 
+                                                                            gap: 3,
+                                                                            opacity: group.videoUrl ? 1 : 0.6,
+                                                                            cursor: group.videoUrl ? 'pointer' : 'not-allowed'
+                                                                        }}
+                                                                    >
+                                                                        <FiSend size={11} /><span className="member-btn-label">WA Video</span>
+                                                                    </button>
                                                                     <button
                                                                         className="btn btn-xs btn-ghost"
                                                                         onClick={() => setEditRecord(member)}
@@ -737,7 +1031,7 @@ export default function GruplarPage() {
                                                 </div>
                                             )}
 
-                                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                                                 {/* Video Yükle */}
                                                 <button
                                                     className="btn btn-xs"
@@ -748,22 +1042,83 @@ export default function GruplarPage() {
                                                     <FiVideo size={12} /> video yükle
                                                 </button>
 
-                                                {/* Video SMS Durumu */}
-                                                {group.videoUrl && (
-                                                    <span style={{
-                                                        fontSize: 10,
-                                                        padding: '4px 8px',
-                                                        borderRadius: 4,
-                                                        fontWeight: 600,
-                                                        background: group.videoSmsSent ? '#dcfce7' : '#fef3c7',
-                                                        color: group.videoSmsSent ? '#15803d' : '#a16207',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: 4,
-                                                        whiteSpace: 'nowrap'
-                                                    }}>
-                                                        {group.videoSmsSent ? '✓ VİDEO SMS GİTTİ' : '⏳ VİDEO SMS GİTMEDİ'}
+                                                {/* Video Durumu - Kompakt Icon */}
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                                                    <span style={{ fontSize: 9, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                                                        Video
                                                     </span>
+                                                    <span 
+                                                        style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            width: 22,
+                                                            height: 22,
+                                                            borderRadius: '50%',
+                                                            background: group.videoUrl ? '#dcfce7' : '#fee2e2',
+                                                            border: group.videoUrl ? '1.5px solid #15803d' : '1.5px solid #dc2626',
+                                                        }}
+                                                        title={group.videoUrl ? 'Video Yüklendi' : 'Video Yüklenmedi'}
+                                                    >
+                                                        {group.videoUrl ? (
+                                                            <FiCheck size={14} style={{ color: '#15803d', strokeWidth: 3 }} />
+                                                        ) : (
+                                                            <FiMinus size={14} style={{ color: '#dc2626', strokeWidth: 3 }} />
+                                                        )}
+                                                    </span>
+                                                </div>
+
+                                                {/* SMS Durumu - Kompakt Icon */}
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                                                    <span style={{ fontSize: 9, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>
+                                                        SMS
+                                                    </span>
+                                                    <span 
+                                                        style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            width: 22,
+                                                            height: 22,
+                                                            borderRadius: '50%',
+                                                            background: group.videoSmsSent ? '#dcfce7' : '#fee2e2',
+                                                            border: group.videoSmsSent ? '1.5px solid #15803d' : '1.5px solid #dc2626',
+                                                        }}
+                                                        title={group.videoSmsSent ? 'SMS Gönderildi' : 'SMS Gönderilmedi'}
+                                                    >
+                                                        {group.videoSmsSent ? (
+                                                            <FiCheck size={14} style={{ color: '#15803d', strokeWidth: 3 }} />
+                                                        ) : (
+                                                            <FiMinus size={14} style={{ color: '#dc2626', strokeWidth: 3 }} />
+                                                        )}
+                                                    </span>
+                                                </div>
+
+                                                {/* SMS Gönder Butonu - Video varsa göster */}
+                                                {group.videoUrl && (
+                                                    <button
+                                                        className="btn btn-xs"
+                                                        style={{ 
+                                                            fontSize: 11, 
+                                                            padding: '4px 8px', 
+                                                            background: group.videoSmsSent ? '#6b7280' : '#16a34a', 
+                                                            color: '#fff', 
+                                                            border: 'none', 
+                                                            display: 'flex', 
+                                                            alignItems: 'center', 
+                                                            gap: 4,
+                                                            opacity: sendingSmsGroupId === group.id ? 0.6 : 1
+                                                        }}
+                                                        onClick={() => handleSendGroupSms(group)}
+                                                        disabled={sendingSmsGroupId === group.id}
+                                                        title={group.videoSmsSent ? 'SMS Tekrar Gönder' : 'Toplu SMS Gönder'}
+                                                    >
+                                                        {sendingSmsGroupId === group.id ? (
+                                                            <><div style={{ width: 12, height: 12, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> SMS...</>
+                                                        ) : (
+                                                            <><FiSend size={12} /> SMS Gönder</>
+                                                        )}
+                                                    </button>
                                                 )}
 
                                                 {!locked && (
@@ -827,6 +1182,76 @@ export default function GruplarPage() {
                     onClose={() => setVideoUploadGroup(null)}
                     onSuccess={() => setRefreshTrigger(prev => prev + 1)}
                 />
+            )}
+
+            {/* Video İstatistik Modal */}
+            {videoStatsModal.type && (
+                <div className="modal-backdrop" onClick={closeVideoStatsModal}>
+                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 600 }}>
+                        <div className="modal-header">
+                            <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                {videoStatsModal.type === 'uploaded' && <><FiCheck style={{ color: '#15803d' }} /> Video Yüklenen Gruplar</>}
+                                {videoStatsModal.type === 'not-uploaded' && <><FiMinus style={{ color: '#dc2626' }} /> Video Yüklenmeyen Gruplar</>}
+                                {videoStatsModal.type === 'sms-pending' && <><FiSend style={{ color: '#d97706' }} /> SMS Bekleyen Gruplar</>}
+                            </h3>
+                            <button className="btn btn-icon btn-ghost" onClick={closeVideoStatsModal}>
+                                <FiX />
+                            </button>
+                        </div>
+                        <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                            {videoStatsModal.groups.length === 0 ? (
+                                <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>
+                                    <p>Bu kategoride grup bulunmuyor.</p>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                    {videoStatsModal.groups.map((group) => {
+                                        const groupMembers = records.filter(r => group.memberIds.includes(r.id));
+                                        return (
+                                            <div
+                                                key={group.id}
+                                                style={{
+                                                    padding: 16,
+                                                    background: '#f8fafc',
+                                                    border: '1px solid #e2e8f0',
+                                                    borderRadius: 8,
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                    gap: 12
+                                                }}
+                                            >
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ fontWeight: 600, fontSize: 15, color: '#1e293b', marginBottom: 4 }}>
+                                                        {group.name}
+                                                    </div>
+                                                    <div style={{ fontSize: 12, color: '#64748b' }}>
+                                                        {group.shareTypeName} • {groupMembers.length} kişi
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    className="btn btn-sm btn-primary"
+                                                    onClick={() => {
+                                                        closeVideoStatsModal();
+                                                        setTimeout(() => scrollToGroup(group.id), 100);
+                                                    }}
+                                                    style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
+                                                >
+                                                    <FiVideo size={14} /> Gruba Git
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-ghost" onClick={closeVideoStatsModal}>
+                                Kapat
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Delete Member Confirm */}

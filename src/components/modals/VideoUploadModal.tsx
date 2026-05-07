@@ -14,6 +14,13 @@ interface Props {
 export default function VideoUploadModal({ group, onClose, onSuccess }: Props) {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [previewMode, setPreviewMode] = useState(false);
+    const [videoMetadata, setVideoMetadata] = useState<{
+        duration: number;
+        size: string;
+        name: string;
+        timestamp: string;
+    } | null>(null);
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [uploadSuccess, setUploadSuccess] = useState(false);
@@ -21,6 +28,7 @@ export default function VideoUploadModal({ group, onClose, onSuccess }: Props) {
     const [sendingSms, setSendingSms] = useState(false);
     const [members, setMembers] = useState<Record[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
 
     useEffect(() => {
         loadMembers();
@@ -49,9 +57,40 @@ export default function VideoUploadModal({ group, onClose, onSuccess }: Props) {
         setSelectedFile(file);
         setUploadSuccess(false);
 
-        // Video önizleme
+        // Video önizleme URL'i oluştur
         const url = URL.createObjectURL(file);
         setPreviewUrl(url);
+
+        // Metadata'yı çıkar (video element yüklendikinde)
+        const tempVideo = document.createElement('video');
+        tempVideo.preload = 'metadata';
+        tempVideo.onloadedmetadata = () => {
+            setVideoMetadata({
+                duration: tempVideo.duration,
+                size: (file.size / (1024 * 1024)).toFixed(2) + ' MB',
+                name: file.name,
+                timestamp: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+            });
+            tempVideo.remove();
+        };
+        tempVideo.src = url;
+
+        // Preview mode'a geç
+        setPreviewMode(true);
+    };
+
+    const handleChangeVideo = () => {
+        setSelectedFile(null);
+        setPreviewUrl(null);
+        setVideoMetadata(null);
+        setPreviewMode(false);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    const handleConfirmVideo = () => {
+        setPreviewMode(false);
     };
 
     const handleUpload = async () => {
@@ -88,7 +127,7 @@ export default function VideoUploadModal({ group, onClose, onSuccess }: Props) {
                 videoSmsSent: false
             });
 
-            console.log('✅ Firestore güncellendi');
+            console.log('✅ Firestore güncellendi - videoUrl:', downloadURL, 'videoSmsSent:', false);
 
             setUploadSuccess(true);
             setUploadedVideoUrl(downloadURL);
@@ -96,7 +135,11 @@ export default function VideoUploadModal({ group, onClose, onSuccess }: Props) {
             setPreviewUrl(null);
             
             // Grup bilgisini güncelle (parent'ı refresh et)
+            console.log('📢 onSuccess çağrılıyor - gruplar yenilenecek');
             onSuccess();
+            
+            // Başarı mesajı göster
+            alert('✅ Video başarıyla yüklendi! Şimdi grup üyelerine SMS gönderebilirsiniz.');
             
             // MODAL AÇIK KALSIN - SMS gönderilebilsin
         } catch (error: any) {
@@ -147,8 +190,14 @@ export default function VideoUploadModal({ group, onClose, onSuccess }: Props) {
                 videoSmsSent: true
             });
 
-            alert(`✓ ${members.length} kişiye video SMS başarıyla gönderildi!`);
+            console.log('✅ SMS durumu güncellendi - videoSmsSent:', true);
+            console.log('📢 onSuccess çağrılıyor - gruplar yenilenecek');
+            
+            // Önce state'i güncelle
             onSuccess();
+            
+            // Sonra mesajı göster ve kapat
+            alert(`✓ ${members.length} kişiye video SMS başarıyla gönderildi!`);
             onClose();
         } catch (error) {
             console.error('SMS gönderme hatası:', error);
@@ -178,7 +227,101 @@ export default function VideoUploadModal({ group, onClose, onSuccess }: Props) {
                 </div>
 
                 <div className="modal-body">
-                    {/* Mevcut Video Bilgisi */}
+                    {/* PREVIEW MODE - Büyük Video Önizleme */}
+                    {previewMode && previewUrl && selectedFile ? (
+                        <div style={{ padding: 0 }}>
+                            {/* Büyük Video Player */}
+                            <div style={{ marginBottom: 20 }}>
+                                <video
+                                    ref={videoRef}
+                                    src={previewUrl}
+                                    controls
+                                    autoPlay
+                                    style={{
+                                        width: '100%',
+                                        maxHeight: '60vh',
+                                        borderRadius: 8,
+                                        backgroundColor: '#000'
+                                    }}
+                                />
+                            </div>
+
+                            {/* Video Meta Bilgileri */}
+                            <div style={{
+                                padding: 16,
+                                background: '#f0f9ff',
+                                borderRadius: 8,
+                                border: '1px solid #bae6fd',
+                                marginBottom: 20
+                            }}>
+                                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, color: '#0369a1', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    📹 Video Bilgileri
+                                </div>
+                                <div style={{ display: 'grid', gap: 8 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                                        <span style={{ color: '#64748b' }}>📄</span>
+                                        <span style={{ fontWeight: 500, color: '#334155' }}>{videoMetadata?.name || selectedFile.name}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                                        <span style={{ color: '#64748b' }}>📊</span>
+                                        <span style={{ color: '#334155' }}>{videoMetadata?.size || (selectedFile.size / (1024 * 1024)).toFixed(2) + ' MB'}</span>
+                                    </div>
+                                    {videoMetadata?.duration && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                                            <span style={{ color: '#64748b' }}>⏱️</span>
+                                            <span style={{ color: '#334155' }}>
+                                                {Math.floor(videoMetadata.duration / 60)}:{String(Math.floor(videoMetadata.duration % 60)).padStart(2, '0')} ({Math.floor(videoMetadata.duration)} saniye)
+                                            </span>
+                                        </div>
+                                    )}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                                        <span style={{ color: '#64748b' }}>📅</span>
+                                        <span style={{ color: '#334155' }}>Seçim: {videoMetadata?.timestamp || new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Aksiyon Butonları */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                <button
+                                    className="btn btn-success"
+                                    onClick={handleConfirmVideo}
+                                    style={{
+                                        width: '100%',
+                                        minHeight: 48,
+                                        fontSize: 15,
+                                        fontWeight: 600,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: 8
+                                    }}
+                                >
+                                    <FiCheck size={20} /> Bu Videoyu Yükle
+                                </button>
+                                <button
+                                    className="btn btn-ghost"
+                                    onClick={handleChangeVideo}
+                                    style={{
+                                        width: '100%',
+                                        minHeight: 48,
+                                        fontSize: 15,
+                                        fontWeight: 600,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: 8,
+                                        border: '2px solid #ef4444',
+                                        color: '#ef4444'
+                                    }}
+                                >
+                                    <FiX size={20} /> Başka Video Seç
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                    {/* NORMAL MODE - Mevcut Video Bilgisi */}
                     {group.videoUrl && (
                         <div style={{
                             padding: 12,
@@ -217,46 +360,23 @@ export default function VideoUploadModal({ group, onClose, onSuccess }: Props) {
                     )}
 
                     {/* Dosya Seçimi */}
-                    <div className="form-group">
-                        <label>Galeriden Video Seç</label>
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="video/*"
-                            onChange={handleFileSelect}
-                            style={{ display: 'none' }}
-                        />
-                        <button
-                            className="btn btn-primary"
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={uploading}
-                            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-                        >
-                            <FiVideo /> Galeri veya Kameradan Video Seç
-                        </button>
-                        {selectedFile && (
-                            <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
-                                Seçilen: {selectedFile.name} ({(selectedFile.size / (1024 * 1024)).toFixed(2)} MB)
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Video Önizleme */}
-                    {previewUrl && (
-                        <div style={{ marginTop: 15 }}>
-                            <label style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, display: 'block' }}>
-                                Önizleme
-                            </label>
-                            <video
-                                src={previewUrl}
-                                controls
-                                style={{
-                                    width: '100%',
-                                    maxHeight: 300,
-                                    borderRadius: 6,
-                                    border: '1px solid #ddd'
-                                }}
+                    {!previewMode && !uploading && !uploadSuccess && (
+                        <div className="form-group">
+                            <label>Galeriden Video Seç</label>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="video/*"
+                                onChange={handleFileSelect}
+                                style={{ display: 'none' }}
                             />
+                            <button
+                                className="btn btn-primary"
+                                onClick={() => fileInputRef.current?.click()}
+                                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, fontSize: 15 }}
+                            >
+                                <FiVideo size={20} /> Galeri veya Kameradan Video Seç
+                            </button>
                         </div>
                     )}
 
@@ -302,23 +422,28 @@ export default function VideoUploadModal({ group, onClose, onSuccess }: Props) {
                     )}
 
                     {/* SMS Bilgisi */}
-                    <div style={{
-                        marginTop: 20,
-                        padding: 12,
-                        background: '#fef3c7',
-                        border: '1px solid #fde68a',
-                        borderRadius: 6,
-                        fontSize: 12,
-                        color: '#92400e'
-                    }}>
-                        <strong>SMS İçeriği:</strong>
-                        <div style={{ marginTop: 6, lineHeight: 1.5 }}>
-                            "SAYIN [AD SOYAD] KURBANINIZ KESİLMİŞTİR. ALLAH KABUL ETSİN. 
-                            KURBAN KESİM VİDEONUZU LİNK ÜZERİNDEN İZLEYEBİLİRSİNİZ. [VİDEO LİNKİ]"
+                    {!previewMode && (
+                        <div style={{
+                            marginTop: 20,
+                            padding: 12,
+                            background: '#fef3c7',
+                            border: '1px solid #fde68a',
+                            borderRadius: 6,
+                            fontSize: 12,
+                            color: '#92400e'
+                        }}>
+                            <strong>SMS İçeriği:</strong>
+                            <div style={{ marginTop: 6, lineHeight: 1.5 }}>
+                                "SAYIN [AD SOYAD] KURBANINIZ KESİLMİŞTİR. ALLAH KABUL ETSİN. 
+                                KURBAN KESİM VİDEONUZU LİNK ÜZERİNDEN İZLEYEBİLİRSİNİZ. [VİDEO LİNKİ]"
+                            </div>
                         </div>
-                    </div>
+                    )}
+                    </>
+                    )}
                 </div>
 
+                {!previewMode && (
                 <div className="modal-footer" style={{ display: 'flex', gap: 8, justifyContent: 'space-between', flexWrap: 'wrap' }}>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         {selectedFile && !uploading && !uploadSuccess && (
@@ -351,6 +476,7 @@ export default function VideoUploadModal({ group, onClose, onSuccess }: Props) {
                         Kapat
                     </button>
                 </div>
+                )}
             </div>
         </div>
     );

@@ -265,11 +265,26 @@ export default function IptalEdilenlerModal({ onClose }: Props) {
                                 <FiDownload /> Excel
                             </button>
                             <button
-                                className="btn btn-ghost btn-sm"
+                                className="btn btn-sm"
                                 onClick={onClose}
-                                style={{ background: 'rgba(0,0,0,0.07)', border: '1px solid rgba(0,0,0,0.15)' }}
+                                style={{ 
+                                    background: '#ef4444',
+                                    color: '#fff',
+                                    border: '2px solid #dc2626',
+                                    fontWeight: 600,
+                                    transition: 'all 0.2s',
+                                    minWidth: '90px'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = '#dc2626';
+                                    e.currentTarget.style.transform = 'scale(1.05)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = '#ef4444';
+                                    e.currentTarget.style.transform = 'scale(1)';
+                                }}
                             >
-                                <FiX /> Kapat
+                                <FiX size={18} /> Kapat
                             </button>
                         </div>
                     </div>
