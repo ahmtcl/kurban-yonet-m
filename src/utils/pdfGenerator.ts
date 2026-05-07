@@ -61,7 +61,7 @@ const createPdfContent = async (doc: jsPDF, record: Record, settings: Settings |
     // Logo or Company Title
     let logoHeight = 0;
     try {
-        const logoResponse = await fetch('/logo.png');
+        const logoResponse = await fetch('/yenılogo.png');
         if (logoResponse.ok) {
             const blob = await logoResponse.blob();
             const base64 = await new Promise<string>((resolve) => {
@@ -203,7 +203,7 @@ const createPdfContent = async (doc: jsPDF, record: Record, settings: Settings |
     doc.save(`Makbuz_${record.orderNumber || record.ownerName.replace(/\s+/g, '_')}.pdf`);
 }
 
-// ===== KESİM LİSTESİ PDF (A5 DİKEY) =====
+// ===== KESİM LİSTESİ PDF =====
 export const generateKesimListesiPDF = async (
     type: 'kucukbas' | 'buyukbas',
     groups: Group[],
@@ -213,7 +213,13 @@ export const generateKesimListesiPDF = async (
     day: 1 | 2 | 3,
     kucukbasShareTypeId: string,
 ) => {
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
+    // BÜYÜKBAŞ: A5 Yatay (3 sütun yan yana)
+    // KÜÇÜKBAŞ: A5 Dikey (tek kayıt/sayfa)
+    const doc = new jsPDF({
+        orientation: type === 'buyukbas' ? 'landscape' : 'portrait',
+        unit: 'mm',
+        format: 'a5' // Her iki tip için A5
+    });
 
     // Font loader
     const loadFont = async (url: string, name: string, style: string) => {
@@ -238,7 +244,7 @@ export const generateKesimListesiPDF = async (
     let logoBase64: string | null = null;
     let logoRatio = 0.4;
     try {
-        const res = await fetch('/logo.png');
+        const res = await fetch('/yenılogo.png');
         if (res.ok) {
             const blob = await res.blob();
             logoBase64 = await new Promise<string>(resolve => {
@@ -256,47 +262,14 @@ export const generateKesimListesiPDF = async (
     } catch { /* logo yüklenemedi, devam et */ }
 
     const companyName = settings?.companyName || '';
-    const W = 148;
-    const margin = 8;
-    const cW = W - margin * 2;
     const year = new Date().getFullYear();
-
-    // ---- Ortak header çizici ----
-    const drawHeader = (shareTypeName?: string): number => {
-        let y = margin + 2; // Üstten biraz boşluk ekle
-
-        if (logoBase64) {
-            const lw = 50; // Logo boyutu büyütüldü (22 → 50mm)
-            const lh = Math.min(lw * logoRatio, 45); // Maksimum yükseklik artırıldı (30 → 45mm)
-            doc.addImage(logoBase64, 'PNG', (W - lw) / 2, y, lw, lh);
-            y += lh + 6; // Alttan daha fazla boşluk (4 → 6mm)
-        }
-
-        // Firma ünvanı kaldırıldı (kullanıcı isteği)
-
-        doc.setFont(font, 'normal');
-        doc.setFontSize(11);
-        doc.setTextColor(0);
-        doc.text(`${year} KURBAN BAYRAMI`, W / 2, y, { align: 'center' });
-        y += 6;
-
-        if (shareTypeName) {
-            doc.setFont(font, 'bold');
-            doc.setFontSize(11);
-            doc.text(shareTypeName.toUpperCase(), W / 2, y, { align: 'center' });
-            y += 6;
-        }
-
-        doc.setDrawColor(0);
-        doc.setLineWidth(0.6);
-        doc.line(margin, y, W - margin, y);
-        y += 6;
-
-        return y;
-    };
 
     // ---- KÜÇÜKBAŞ ----
     if (type === 'kucukbas') {
+        const W = 148; // A5 genişlik
+        const H = 210; // A5 yükseklik
+        const margin = 8; // Margin azaltıldı (10 → 8mm)
+
         const recs = allRecords
             .filter(r =>
                 r.shareTypeId === kucukbasShareTypeId &&
@@ -312,32 +285,63 @@ export const generateKesimListesiPDF = async (
         }
 
         recs.forEach((record, idx) => {
-            if (idx > 0) doc.addPage([148, 210], 'portrait');
+            if (idx > 0) doc.addPage([W, H], 'portrait');
 
-            let y = drawHeader();
+            let y = margin + 5;
 
+            // Logo ortalı (maksimum büyüklük - yeni siyah logo)
+            if (logoBase64) {
+                const lw = 60; // Logo genişliği maksimum (35 → 60mm)
+                const lh = Math.min(lw * logoRatio, 50); // Max yükseklik (30 → 50mm)
+                doc.addImage(logoBase64, 'PNG', (W - lw) / 2, y, lw, lh);
+                y += lh + 10;
+            } else {
+                y += 10;
+            }
+
+            // 2026 KURBAN BAYRAMI (büyük, altında çizgi)
             doc.setFont(font, 'bold');
-            doc.setFontSize(16);
-            doc.setTextColor(0);
-            doc.text('KÜÇÜKBAŞ KURBAN', W / 2, y + 4, { align: 'center' });
-            y += 16;
+            doc.setFontSize(18); // Font artırıldı (14 → 18pt)
+            doc.setTextColor(0, 0, 0);
+            doc.text(`${year} KURBAN BAYRAMI`, W / 2, y, { align: 'center' });
+            y += 8;
 
-            // Büyük numara
-            doc.setFont(font, 'bold');
-            doc.setFontSize(72);
-            doc.text(String(idx + 1), W / 2, y + 30, { align: 'center' });
-            y += 46;
+            // Altına yatay çizgi
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.8);
+            doc.line(margin + 5, y, W - margin - 5, y);
+            y += 12;
 
-            // İsim
+            // KÜÇÜKBAŞ KURBAN (büyük)
             doc.setFont(font, 'bold');
-            doc.setFontSize(18);
-            doc.setTextColor(0);
-            const nameLines = doc.splitTextToSize(record.ownerName.toUpperCase(), cW);
-            doc.text(nameLines, W / 2, y + 6, { align: 'center' });
+            doc.setFontSize(20); // Font artırıldı (14 → 20pt)
+            doc.setTextColor(0, 0, 0);
+            doc.text('KÜÇÜKBAŞ KURBAN', W / 2, y, { align: 'center' });
+            y += 30;
+
+            // Büyük numara (maksimum boyut)
+            doc.setFont(font, 'bold');
+            doc.setFontSize(120); // Font artırıldı (70 → 120pt)
+            doc.setTextColor(0, 0, 0);
+            doc.text(String(idx + 1), W / 2, y + 40, { align: 'center' });
+            y += 70;
+
+            // İsim (maksimum büyüklük, bold)
+            doc.setFont(font, 'bold');
+            doc.setFontSize(22); // Font artırıldı (16 → 22pt)
+            doc.setTextColor(0, 0, 0);
+            const nameLines = doc.splitTextToSize(record.ownerName.toUpperCase(), W - margin * 2);
+            doc.text(nameLines, W / 2, y, { align: 'center' });
         });
 
     // ---- BÜYÜKBAŞ ----
     } else {
+        const W = 210; // A5 landscape genişlik
+        const H = 148; // A5 landscape yükseklik
+        const margin = 5;
+        const colW = (W - margin * 2) / 3; // 3 sütun
+        const colMargin = 2; // Sütun içi kenar boşluğu
+
         const nonKucukbasIds = shareTypes
             .filter(st => st.id !== kucukbasShareTypeId)
             .map(st => st.id);
@@ -356,59 +360,116 @@ export const generateKesimListesiPDF = async (
             return;
         }
 
-        filteredGroups.forEach((group, idx) => {
-            if (idx > 0) doc.addPage([148, 210], 'portrait');
+        // 3'er grup halinde sayfala
+        for (let pageIdx = 0; pageIdx < filteredGroups.length; pageIdx += 3) {
+            if (pageIdx > 0) doc.addPage([W, H], 'landscape');
 
-            const shareType = shareTypes.find(st => st.id === group.shareTypeId);
-            const stName = shareType?.name || group.shareTypeName || '';
-            const members = group.memberIds
-                .map(mid => allRecords.find(r => r.id === mid))
-                .filter(Boolean) as Record[];
+            const pageGroups = filteredGroups.slice(pageIdx, pageIdx + 3);
 
-            let y = drawHeader(stName);
+            pageGroups.forEach((group, colIdx) => {
+                const shareType = shareTypes.find(st => st.id === group.shareTypeId);
+                const stName = shareType?.name || group.shareTypeName || '';
+                const members = group.memberIds
+                    .map(mid => allRecords.find(r => r.id === mid))
+                    .filter(Boolean) as Record[];
 
-            // KESİM SIRASI etiketi
-            doc.setFont(font, 'normal');
-            doc.setFontSize(10);
-            doc.setTextColor(80, 80, 80);
-            doc.text('KESİM SIRASI', W / 2, y, { align: 'center' });
-            y += 4;
+                const colX = margin + colIdx * colW;
+                let y = margin + 2;
 
-            // Kutu + numara
-            const boxW = 35;
-            const boxH = 24;
-            const boxX = (W - boxW) / 2;
-            doc.setDrawColor(0);
-            doc.setLineWidth(1.2);
-            doc.setFillColor(255, 255, 255);
-            doc.rect(boxX, y, boxW, boxH, 'FD');
-            doc.setFont(font, 'bold');
-            doc.setFontSize(24);
-            doc.setTextColor(0);
-            doc.text(String(group.kesimSiraNo ?? '-'), W / 2, y + boxH * 0.68, { align: 'center' });
-            y += boxH + 8;
-
-            // Üye listesi (7 satır) - Font ve satır yükseklikleri artırıldı
-            for (let i = 0; i < 7; i++) {
-                const member = members[i];
-                if (i % 2 === 0) {
-                    doc.setFillColor(246, 246, 246);
-                    doc.rect(margin, y - 4.5, cW, 12, 'F');
+                // Logo ortalı (maksimum büyüklük - yeni siyah logo)
+                if (logoBase64) {
+                    const lw = 42; // Logo genişliği maksimum artırıldı (38 → 42mm)
+                    const lh = Math.min(lw * logoRatio, 35); // Maksimum yükseklik artırıldı (30 → 35mm)
+                    doc.addImage(logoBase64, 'PNG', colX + (colW - lw) / 2, y, lw, lh);
+                    y += lh + 3;
+                } else {
+                    y += 3;
                 }
+
+                // 2026 KURBAN BAYRAMI (fontlar büyütüldü)
                 doc.setFont(font, 'bold');
-                doc.setFontSize(11);
-                doc.setTextColor(100, 100, 100);
-                doc.text(String(i + 1), margin + 2, y);
+                doc.setFontSize(10); // Font artırıldı (9 → 10pt)
+                doc.setTextColor(0, 0, 0);
+                doc.text(`${year} KURBAN`, colX + colW / 2, y, { align: 'center' });
+                y += 4.5; // Spacing artırıldı (4 → 4.5mm)
+                doc.text('BAYRAMI', colX + colW / 2, y, { align: 'center' });
+                y += 4.5; // Spacing artırıldı (4 → 4.5mm)
 
-                if (member) {
-                    doc.setFont(font, 'normal');
-                    doc.setFontSize(13); // Font boyutu artırıldı (10 → 13pt)
-                    doc.setTextColor(0);
-                    doc.text(member.ownerName, margin + 10, y);
+                // ShareType ağırlık bilgisi (30-35 KG gibi)
+                doc.setFont(font, 'bold');
+                doc.setFontSize(10); // Font artırıldı (9 → 10pt)
+                doc.text('30-35 KG', colX + colW / 2, y, { align: 'center' });
+                y += 6;
+
+                // Üst çizgi
+                doc.setDrawColor(0, 0, 0);
+                doc.setLineWidth(0.5);
+                doc.line(colX + colMargin, y, colX + colW - colMargin, y);
+                y += 3;
+
+                // KESİM SIRASI başlık + numara (yan yana, tablo içinde)
+                const headerH = 10;
+                const leftW = colW * 0.6;
+                const rightW = colW * 0.4;
+
+                // Sol hücre (KESİM SIRASI yazısı)
+                doc.setDrawColor(0, 0, 0);
+                doc.setLineWidth(0.5);
+                doc.rect(colX + colMargin, y, leftW - colMargin * 2, headerH);
+                doc.setFont(font, 'bold');
+                doc.setFontSize(9); // Font artırıldı (8 → 9pt)
+                doc.setTextColor(0, 0, 0);
+                doc.text('KESİM SIRASI', colX + leftW / 2, y + headerH * 0.65, { align: 'center' });
+
+                // Sağ hücre (Numara)
+                doc.rect(colX + leftW - colMargin, y, rightW - colMargin, headerH);
+                doc.setFont(font, 'bold');
+                doc.setFontSize(20); // Font artırıldı (18 → 20pt)
+                doc.text(String(group.kesimSiraNo ?? '-'), colX + leftW + rightW / 2 - colMargin, y + headerH * 0.7, { align: 'center' });
+                y += headerH;
+
+                // Üye listesi (1-7) - tablo formatında
+                const rowH = 9;
+                const numW = 10;
+                for (let i = 0; i < 7; i++) {
+                    const member = members[i];
+                    
+                    // Satır kenarlıkları
+                    doc.setDrawColor(0, 0, 0); // Siyah kenarlık
+                    doc.setLineWidth(0.3);
+                    doc.rect(colX + colMargin, y, colW - colMargin * 2, rowH);
+
+                    // Sıra numarası hücresi (sol)
+                    doc.setDrawColor(0, 0, 0); // Siyah ayırıcı
+                    doc.line(colX + colMargin + numW, y, colX + colMargin + numW, y + rowH);
+                    
+                    doc.setFont(font, 'bold');
+                    doc.setFontSize(9); // Font artırıldı (8 → 9pt)
+                    doc.setTextColor(0, 0, 0);
+                    doc.text(String(i + 1), colX + colMargin + numW / 2, y + rowH * 0.65, { align: 'center' });
+
+                    // İsim hücresi (sağ)
+                    if (member) {
+                        doc.setFont(font, 'bold'); // Bold yapıldı
+                        doc.setFontSize(9); // Font artırıldı (8 → 9pt)
+                        doc.setTextColor(0, 0, 0);
+                        const memberName = doc.splitTextToSize(
+                            member.ownerName.toUpperCase(),
+                            colW - colMargin * 2 - numW - 4
+                        )[0];
+                        doc.text(memberName, colX + colMargin + numW + 2, y + rowH * 0.65);
+                    }
+                    y += rowH;
                 }
-                y += 12; // Satır yüksekliği artırıldı (8.5 → 12mm)
-            }
-        });
+
+                // Sütunlar arası ayırıcı çizgi
+                if (colIdx < 2) {
+                    doc.setDrawColor(0, 0, 0); // Siyah ayırıcı
+                    doc.setLineWidth(0.5); // Kalınlık artırıldı (0.3 → 0.5)
+                    doc.line(colX + colW - 1, margin + 5, colX + colW - 1, H - margin - 5);
+                }
+            });
+        }
     }
 
     const dayStr = `gun${day}`;
@@ -486,6 +547,11 @@ export const generateEtiketPDF = async (
         for (let copyIndex = 0; copyIndex < 14; copyIndex++) {
             // Her etiket için yeni sayfa ekle (100×100 mm)
             doc.addPage([W, H], 'portrait');
+            
+            // Renk ve çizgi ayarlarını sıfırla (her etiket için tutarlı olması için)
+            doc.setDrawColor(0, 0, 0);
+            doc.setTextColor(0, 0, 0);
+            doc.setFillColor(255, 255, 255);
 
         const shareType  = shareTypes.find(st => st.id === group.shareTypeId);
         const stName     = shareType?.name || group.shareTypeName || '';
@@ -500,12 +566,13 @@ export const generateEtiketPDF = async (
         const innerW     = W - margin * 2;
 
         // ── Dış kenarlık ──
-        doc.setDrawColor(0);
+        doc.setDrawColor(0, 0, 0); // Siyah çizgi
         doc.setLineWidth(0.8);
         doc.rect(margin, margin, innerW, H - margin * 2);
 
         // ── ÜST BÖLÜM: Hisse adı + Kesim sıra no kutusu ──
         const topH = 22;
+        doc.setDrawColor(0, 0, 0); // Siyah çizgi
         doc.setLineWidth(0.5);
         doc.line(margin, margin + topH, margin + innerW, margin + topH);
 
@@ -514,10 +581,12 @@ export const generateEtiketPDF = async (
         const boxH = topH - 4;
         const boxX = margin + innerW - boxW - 2;
         const boxY = margin + 2;
+        doc.setDrawColor(0, 0, 0); // Siyah çerçeve
         doc.setLineWidth(1.2);
         doc.rect(boxX, boxY, boxW, boxH);
         doc.setFont(font, 'bold');
         doc.setFontSize(16);
+        doc.setTextColor(0, 0, 0); // Siyah renk garanti et
         const siraStr = String(group.kesimSiraNo ?? '-');
         doc.text(siraStr, boxX + boxW / 2, boxY + boxH * 0.68, { align: 'center' });
 
@@ -531,14 +600,14 @@ export const generateEtiketPDF = async (
             nameFontSize -= 1;
             doc.setFontSize(nameFontSize);
         }
-        doc.setTextColor(0);
+        doc.setTextColor(0, 0, 0); // Siyah renk
         doc.text(stName, margin + 3, margin + topH / 2 + nameFontSize * 0.18, { maxWidth: maxNameW });
 
         // ── ORTA: Gün + "HİSSE ORTAKLARI" ──
         let y = margin + topH + 5;
         doc.setFont(font, 'bold');
         doc.setFontSize(9);
-        doc.setTextColor(0);
+        doc.setTextColor(0, 0, 0); // Siyah renk
         doc.text(`${dayLabel(groupDay)} TESLİM`, W / 2, y, { align: 'center' });
         y += 4.5;
         doc.setFontSize(8);
@@ -555,6 +624,7 @@ export const generateEtiketPDF = async (
         const tableX  = margin + 1;
 
         // Tablo dış çerçevesi
+        doc.setDrawColor(0, 0, 0); // Siyah çerçeve
         doc.setLineWidth(0.4);
         doc.rect(tableX, y, tableW, rowH * 7);
 
@@ -564,11 +634,13 @@ export const generateEtiketPDF = async (
 
             // Satır alt çizgisi (son satır hariç)
             if (i < 6) {
+                doc.setDrawColor(0, 0, 0); // Siyah çizgi
                 doc.setLineWidth(0.2);
                 doc.line(tableX, rowY + rowH, tableX + tableW, rowY + rowH);
             }
 
             // Sıra no dikey ayırıcı
+            doc.setDrawColor(0, 0, 0); // Siyah çizgi
             doc.setLineWidth(0.3);
             doc.line(tableX + noColW, rowY, tableX + noColW, rowY + rowH);
 
@@ -582,7 +654,7 @@ export const generateEtiketPDF = async (
             if (member) {
                 doc.setFont(font, 'normal');
                 doc.setFontSize(7.5); // Font biraz küçültüldü (8.5 → 7.5)
-                doc.setTextColor(0);
+                doc.setTextColor(0, 0, 0); // Siyah renk
                 const nameText = doc.splitTextToSize(member.ownerName, nameColW - 3);
                 doc.text(nameText[0], tableX + noColW + 2, rowY + rowH * 0.68);
             }
@@ -611,7 +683,7 @@ export const generateEtiketPDF = async (
                 
                 // QR etrafına ince çerçeve
                 doc.setLineWidth(0.3);
-                doc.setDrawColor(0);
+                doc.setDrawColor(0, 0, 0); // Siyah çerçeve
                 doc.rect(qrX, qrY, qrSize, qrSize);
 
                 // QR altına açıklama metni
@@ -624,7 +696,7 @@ export const generateEtiketPDF = async (
                 console.error('QR kod üretilemedi:', error);
                 // Hata durumunda placeholder göster
                 doc.setLineWidth(0.3);
-                doc.setDrawColor(0);
+                doc.setDrawColor(0, 0, 0); // Siyah çerçeve
                 doc.rect(qrX, qrY, qrSize, qrSize);
                 doc.setFont(font, 'normal');
                 doc.setFontSize(5.5);
@@ -635,7 +707,7 @@ export const generateEtiketPDF = async (
         } else {
             // Video yoksa placeholder göster
             doc.setLineWidth(0.3);
-            doc.setDrawColor(0);
+            doc.setDrawColor(0, 0, 0); // Siyah çerçeve
             doc.rect(qrX, qrY, qrSize, qrSize);
             doc.setFont(font, 'normal');
             doc.setFontSize(5.5);
@@ -644,7 +716,9 @@ export const generateEtiketPDF = async (
             doc.text('KOD', qrX + qrSize / 2, qrY + qrSize / 2 + 4, { align: 'center' });
         }
 
-        doc.setDrawColor(0); // reset
+        // Renk ve çizgi ayarlarını sıfırla (sonraki etiket için)
+        doc.setDrawColor(0, 0, 0);
+        doc.setTextColor(0, 0, 0);
         } // copyIndex döngüsü sonu (14 kopya)
     } // targetGroups döngüsü sonu
 

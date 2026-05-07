@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FiEdit, FiTrash2, FiPlus, FiSettings, FiX, FiDownload, FiCheckSquare, FiSquare, FiHash, FiLock, FiVideo, FiSend, FiCopy, FiCheck, FiMinus } from 'react-icons/fi';
+import { FiEdit, FiTrash2, FiPlus, FiSettings, FiX, FiDownload, FiCheckSquare, FiSquare, FiHash, FiLock, FiVideo, FiSend, FiCopy, FiCheck, FiMinus, FiSearch } from 'react-icons/fi';
 import { getGroups, getShareTypes, getRecords, removeMemberFromGroup, updateRecord, updateGroup, deleteGroup, getSettings } from '@/lib/firestore';
 import type { Group, ShareType, Record } from '@/types';
 import RecordEditModal from '@/components/modals/RecordEditModal';
@@ -60,6 +60,9 @@ export default function GruplarPage() {
     const [showBulkKesimModal, setShowBulkKesimModal] = useState(false);
     const [bulkKesimShareType, setBulkKesimShareType] = useState('');
     const [bulkKesimStartNo, setBulkKesimStartNo] = useState('');
+
+    // Grup Arama State
+    const [groupSearch, setGroupSearch] = useState('');
 
     useEffect(() => {
         console.log('🔄 refreshTrigger değişti:', refreshTrigger, '- loadData çağrılıyor');
@@ -492,9 +495,36 @@ export default function GruplarPage() {
         return false;
     }
 
+    // Grup Arama Filtresi
+    const filteredGroups = groups.filter(group => {
+        if (!groupSearch.trim()) return true; // Arama boşsa tüm grupları göster
+        
+        const searchLower = groupSearch.toLowerCase();
+        
+        // Grup adında ara
+        if (group.name.toLowerCase().includes(searchLower)) return true;
+        
+        // Grup üyelerinin isimlerinde ara
+        const members = group.memberIds
+            .map(mid => records.find(r => r.id === mid))
+            .filter(Boolean);
+        
+        const foundInMembers = members.some(member => 
+            member!.ownerName.toLowerCase().includes(searchLower) ||
+            member!.phone.includes(searchLower)
+        );
+        
+        if (foundInMembers) return true;
+        
+        // Kesim sıra numarasında ara
+        if (group.kesimSiraNo && group.kesimSiraNo.toString().includes(searchLower)) return true;
+        
+        return false;
+    });
+
     // Grouping logic
     const groupsByShareType = shareTypes.map(st => {
-        const typeGroups = groups.filter(g => g.shareTypeId === st.id);
+        const typeGroups = filteredGroups.filter(g => g.shareTypeId === st.id);
         const totalMembersInGroups = typeGroups.reduce((acc, g) => acc + g.memberIds.length, 0);
         return {
             shareType: st,
@@ -665,6 +695,68 @@ export default function GruplarPage() {
                 </div>
             </div>
 
+            {/* GRUP ARAMA */}
+            <div style={{ 
+                padding: '16px 24px', 
+                background: '#fff',
+                borderBottom: '1px solid #e5e7eb'
+            }}>
+                <div style={{ maxWidth: 600, margin: '0 auto' }}>
+                    <div style={{ position: 'relative', marginBottom: 0 }}>
+                        <input
+                            className="form-input"
+                            placeholder="🔍 Grup adı, üye ismi, telefon veya kesim sıra no ile ara..."
+                            value={groupSearch}
+                            onChange={(e) => setGroupSearch(e.target.value)}
+                            style={{ 
+                                fontSize: 16, 
+                                padding: '12px 16px',
+                                paddingRight: groupSearch ? '40px' : '16px',
+                                border: '2px solid #3b82f6',
+                                borderRadius: 8,
+                                width: '100%'
+                            }}
+                        />
+                        {groupSearch && (
+                            <button
+                                onClick={() => setGroupSearch('')}
+                                style={{
+                                    position: 'absolute',
+                                    right: 12,
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    background: '#ef4444',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '50%',
+                                    width: 24,
+                                    height: 24,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                    fontSize: 14,
+                                    fontWeight: 'bold'
+                                }}
+                                title="Aramayı temizle"
+                            >
+                                ×
+                            </button>
+                        )}
+                    </div>
+                    {groupSearch && (
+                        <div style={{ 
+                            marginTop: 8, 
+                            fontSize: 13, 
+                            color: '#666',
+                            textAlign: 'center' 
+                        }}>
+                            <strong>{filteredGroups.length}</strong> grup bulundu
+                        </div>
+                    )}
+                </div>
+            </div>
+
             <div className="page-content" style={{ paddingBottom: 50 }}>
                 {/* UNASSIGNED SECTION */}
                 <div className="card unassigned-section" style={{ marginBottom: 24, border: '2px dashed var(--accent-primary)', background: '#f0f9ff' }}>
@@ -742,6 +834,28 @@ export default function GruplarPage() {
                     </div>
                     )}
                 </div>
+
+                {/* Arama sonucu kontrolü */}
+                {groupSearch && filteredGroups.length === 0 && (
+                    <div style={{
+                        textAlign: 'center',
+                        padding: '60px 20px',
+                        color: '#999'
+                    }}>
+                        <FiSearch size={48} style={{ marginBottom: 16, opacity: 0.5 }} />
+                        <h3 style={{ marginBottom: 8, color: '#666' }}>Sonuç bulunamadı</h3>
+                        <p style={{ fontSize: 14 }}>
+                            "<strong>{groupSearch}</strong>" araması için eşleşen grup bulunamadı.
+                        </p>
+                        <button
+                            onClick={() => setGroupSearch('')}
+                            className="btn btn-primary btn-sm"
+                            style={{ marginTop: 16 }}
+                        >
+                            Aramayı Temizle
+                        </button>
+                    </div>
+                )}
 
                 {groupsByShareType.map(({ shareType, groups: typeGroups, stats }) => (
                     <div key={shareType.id} style={{ marginBottom: 40 }}>
