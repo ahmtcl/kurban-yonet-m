@@ -363,13 +363,16 @@ export const generateKesimListesiPDF = async (
         filteredGroups.forEach((group, idx) => {
             if (idx > 0) doc.addPage([W, H], 'portrait');
 
+            const shareType = shareTypes.find(st => st.id === group.shareTypeId);
+            const shareTypeName = shareType?.name || group.shareTypeName || '';
+
             const members = group.memberIds
                 .map(mid => allRecords.find(r => r.id === mid))
                 .filter(Boolean) as Record[];
 
             let y = margin;
 
-            // ─── Logo (genişliğe göre orantılı, max yükseklik 28mm) ───
+            // ─── Logo (genişliğe göre orantılı, max yükseklik 50mm) ───
             if (logoBase64) {
                 const lw = innerW; // Tam genişliği kullan (132mm)
                 const lh = Math.min(lw * logoRatio, 50); // Max 50mm yükseklik
@@ -389,7 +392,7 @@ export const generateKesimListesiPDF = async (
 
             doc.setFont(font, 'bold');
             doc.setFontSize(15);
-            doc.text('30-35 KG', W / 2, y, { align: 'center' });
+            doc.text(shareTypeName.toUpperCase(), W / 2, y, { align: 'center' });
             y += 6;
 
             // ─── Yatay çizgi ───
