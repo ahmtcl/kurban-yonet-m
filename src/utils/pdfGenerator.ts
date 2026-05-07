@@ -336,11 +336,9 @@ export const generateKesimListesiPDF = async (
 
     // ---- BÜYÜKBAŞ ----
     } else {
-        const W = 210; // A5 landscape genişlik
-        const H = 148; // A5 landscape yükseklik
-        const margin = 5;
-        const colW = (W - margin * 2) / 3; // 3 sütun
-        const colMargin = 2; // Sütun içi kenar boşluğu
+        const W = 148; // A5 portrait genişlik
+        const H = 210; // A5 portrait yükseklik
+        const margin = 10;
 
         const nonKucukbasIds = shareTypes
             .filter(st => st.id !== kucukbasShareTypeId)
@@ -360,116 +358,104 @@ export const generateKesimListesiPDF = async (
             return;
         }
 
-        // 3'er grup halinde sayfala
-        for (let pageIdx = 0; pageIdx < filteredGroups.length; pageIdx += 3) {
-            if (pageIdx > 0) doc.addPage([W, H], 'landscape');
+        // Her grup ayrı sayfada
+        filteredGroups.forEach((group, idx) => {
+            if (idx > 0) doc.addPage([W, H], 'portrait');
 
-            const pageGroups = filteredGroups.slice(pageIdx, pageIdx + 3);
+            const shareType = shareTypes.find(st => st.id === group.shareTypeId);
+            const stName = shareType?.name || group.shareTypeName || '';
+            const members = group.memberIds
+                .map(mid => allRecords.find(r => r.id === mid))
+                .filter(Boolean) as Record[];
 
-            pageGroups.forEach((group, colIdx) => {
-                const shareType = shareTypes.find(st => st.id === group.shareTypeId);
-                const stName = shareType?.name || group.shareTypeName || '';
-                const members = group.memberIds
-                    .map(mid => allRecords.find(r => r.id === mid))
-                    .filter(Boolean) as Record[];
+            let y = margin;
 
-                const colX = margin + colIdx * colW;
-                let y = margin + 2;
+            // Logo ortalı (maksimum büyüklük)
+            if (logoBase64) {
+                const lw = 60; // Logo genişliği maksimum
+                const lh = Math.min(lw * logoRatio, 50);
+                doc.addImage(logoBase64, 'PNG', (W - lw) / 2, y, lw, lh);
+                y += lh + 8;
+            } else {
+                y += 8;
+            }
 
-                // Logo ortalı (maksimum büyüklük - yeni siyah logo)
-                if (logoBase64) {
-                    const lw = 42; // Logo genişliği maksimum artırıldı (38 → 42mm)
-                    const lh = Math.min(lw * logoRatio, 35); // Maksimum yükseklik artırıldı (30 → 35mm)
-                    doc.addImage(logoBase64, 'PNG', colX + (colW - lw) / 2, y, lw, lh);
-                    y += lh + 3;
-                } else {
-                    y += 3;
-                }
+            // 2026 KURBAN BAYRAMI
+            doc.setFont(font, 'bold');
+            doc.setFontSize(16);
+            doc.setTextColor(0, 0, 0);
+            doc.text(`${year} KURBAN`, W / 2, y, { align: 'center' });
+            y += 6;
+            doc.text('BAYRAMI', W / 2, y, { align: 'center' });
+            y += 6;
 
-                // 2026 KURBAN BAYRAMI (fontlar büyütüldü)
-                doc.setFont(font, 'bold');
-                doc.setFontSize(10); // Font artırıldı (9 → 10pt)
-                doc.setTextColor(0, 0, 0);
-                doc.text(`${year} KURBAN`, colX + colW / 2, y, { align: 'center' });
-                y += 4.5; // Spacing artırıldı (4 → 4.5mm)
-                doc.text('BAYRAMI', colX + colW / 2, y, { align: 'center' });
-                y += 4.5; // Spacing artırıldı (4 → 4.5mm)
+            // 30-35 KG
+            doc.setFont(font, 'bold');
+            doc.setFontSize(16);
+            doc.text('30-35 KG', W / 2, y, { align: 'center' });
+            y += 10;
 
-                // ShareType ağırlık bilgisi (30-35 KG gibi)
-                doc.setFont(font, 'bold');
-                doc.setFontSize(10); // Font artırıldı (9 → 10pt)
-                doc.text('30-35 KG', colX + colW / 2, y, { align: 'center' });
-                y += 6;
+            // Yatay çizgi
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(1);
+            doc.line(margin, y, W - margin, y);
+            y += 8;
 
-                // Üst çizgi
+            // KESİM SIRASI başlık + numara
+            const headerH = 18;
+            const leftW = W * 0.55;
+            const rightW = W * 0.45;
+
+            // Sol hücre
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(1);
+            doc.rect(margin, y, leftW - margin * 2, headerH);
+            doc.setFont(font, 'bold');
+            doc.setFontSize(14);
+            doc.setTextColor(0, 0, 0);
+            doc.text('KESİM SIRASI', leftW / 2, y + headerH * 0.65, { align: 'center' });
+
+            // Sağ hücre (Numara)
+            doc.rect(leftW - margin, y, rightW - margin, headerH);
+            doc.setFont(font, 'bold');
+            doc.setFontSize(28);
+            doc.text(String(group.kesimSiraNo ?? '-'), leftW + (rightW - margin) / 2, y + headerH * 0.7, { align: 'center' });
+            y += headerH;
+
+            // Üye listesi
+            const rowH = 13;
+            const numW = 15;
+            for (let i = 0; i < 7; i++) {
+                const member = members[i];
+                
+                // Satır kenarlıkları
                 doc.setDrawColor(0, 0, 0);
                 doc.setLineWidth(0.5);
-                doc.line(colX + colMargin, y, colX + colW - colMargin, y);
-                y += 3;
+                doc.rect(margin, y, W - margin * 2, rowH);
 
-                // KESİM SIRASI başlık + numara (yan yana, tablo içinde)
-                const headerH = 10;
-                const leftW = colW * 0.6;
-                const rightW = colW * 0.4;
-
-                // Sol hücre (KESİM SIRASI yazısı)
+                // Sıra numarası hücresi
                 doc.setDrawColor(0, 0, 0);
-                doc.setLineWidth(0.5);
-                doc.rect(colX + colMargin, y, leftW - colMargin * 2, headerH);
+                doc.line(margin + numW, y, margin + numW, y + rowH);
+                
                 doc.setFont(font, 'bold');
-                doc.setFontSize(9); // Font artırıldı (8 → 9pt)
+                doc.setFontSize(12);
                 doc.setTextColor(0, 0, 0);
-                doc.text('KESİM SIRASI', colX + leftW / 2, y + headerH * 0.65, { align: 'center' });
+                doc.text(String(i + 1), margin + numW / 2, y + rowH * 0.65, { align: 'center' });
 
-                // Sağ hücre (Numara)
-                doc.rect(colX + leftW - colMargin, y, rightW - colMargin, headerH);
-                doc.setFont(font, 'bold');
-                doc.setFontSize(20); // Font artırıldı (18 → 20pt)
-                doc.text(String(group.kesimSiraNo ?? '-'), colX + leftW + rightW / 2 - colMargin, y + headerH * 0.7, { align: 'center' });
-                y += headerH;
-
-                // Üye listesi (1-7) - tablo formatında
-                const rowH = 9;
-                const numW = 10;
-                for (let i = 0; i < 7; i++) {
-                    const member = members[i];
-                    
-                    // Satır kenarlıkları
-                    doc.setDrawColor(0, 0, 0); // Siyah kenarlık
-                    doc.setLineWidth(0.3);
-                    doc.rect(colX + colMargin, y, colW - colMargin * 2, rowH);
-
-                    // Sıra numarası hücresi (sol)
-                    doc.setDrawColor(0, 0, 0); // Siyah ayırıcı
-                    doc.line(colX + colMargin + numW, y, colX + colMargin + numW, y + rowH);
-                    
+                // İsim hücresi
+                if (member) {
                     doc.setFont(font, 'bold');
-                    doc.setFontSize(9); // Font artırıldı (8 → 9pt)
+                    doc.setFontSize(12);
                     doc.setTextColor(0, 0, 0);
-                    doc.text(String(i + 1), colX + colMargin + numW / 2, y + rowH * 0.65, { align: 'center' });
-
-                    // İsim hücresi (sağ)
-                    if (member) {
-                        doc.setFont(font, 'bold'); // Bold yapıldı
-                        doc.setFontSize(9); // Font artırıldı (8 → 9pt)
-                        doc.setTextColor(0, 0, 0);
-                        const memberName = doc.splitTextToSize(
-                            member.ownerName.toUpperCase(),
-                            colW - colMargin * 2 - numW - 4
-                        )[0];
-                        doc.text(memberName, colX + colMargin + numW + 2, y + rowH * 0.65);
-                    }
-                    y += rowH;
+                    const memberName = doc.splitTextToSize(
+                        member.ownerName.toUpperCase(),
+                        W - margin * 2 - numW - 4
+                    )[0];
+                    doc.text(memberName, margin + numW + 3, y + rowH * 0.65);
                 }
-
-                // Sütunlar arası ayırıcı çizgi
-                if (colIdx < 2) {
-                    doc.setDrawColor(0, 0, 0); // Siyah ayırıcı
-                    doc.setLineWidth(0.5); // Kalınlık artırıldı (0.3 → 0.5)
-                    doc.line(colX + colW - 1, margin + 5, colX + colW - 1, H - margin - 5);
-                }
-            });
-        }
+                y += rowH;
+            }
+        });
     }
 
     const dayStr = `gun${day}`;
