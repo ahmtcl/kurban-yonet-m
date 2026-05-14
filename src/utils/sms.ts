@@ -7,7 +7,6 @@ export async function sendSMS(phone: string, message: string): Promise<boolean> 
         } else if (formattedPhone.startsWith('5')) {
             formattedPhone = '90' + formattedPhone;
         }
-        // If it's already 905..., leave it. 
 
         const response = await fetch('/api/send-sms', {
             method: 'POST',
@@ -20,10 +19,11 @@ export async function sendSMS(phone: string, message: string): Promise<boolean> 
         const data = await response.json();
 
         if (data.success) {
-            console.log('SMS sent successfully:', data.apiResponse);
+            console.log('SMS operatör yanıtı:', data.apiResponse);
             return true;
         } else {
-            console.error('Failed to send SMS:', data.error);
+            console.error('SMS başarısız - Operatör yanıtı:', data.error || data.apiResponse);
+            alert(`SMS Hatası - Operatör Yanıtı:\n${data.error || data.apiResponse}`);
             return false;
         }
     } catch (error) {

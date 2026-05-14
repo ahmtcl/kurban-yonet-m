@@ -119,7 +119,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: true, apiResponse: responseText });
         }
 
-        return NextResponse.json({ success: true, apiResponse: responseText, warning: 'Unrecognized response format' });
+        return NextResponse.json({ success: false, apiResponse: responseText, error: `Operatör kodu: ${code} - Yanıt: ${responseText}` });
 
     } catch (error) {
         console.error('SMS Send Error:', error);

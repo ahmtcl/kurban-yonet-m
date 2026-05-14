@@ -182,24 +182,27 @@ export default function VideoUploadModal({ group, onClose, onSuccess }: Props) {
                 })
             });
 
-            if (!response.ok) {
-                throw new Error('SMS gönderilemedi');
+            const data = await response.json();
+
+            // Operatör yanıtını detaylı göster
+            let resultMsg = '';
+            if (data.results && Array.isArray(data.results)) {
+                resultMsg = data.results.map((r: any) =>
+                    `${r.name} (${r.phone}): ${r.success ? '✅ ' + r.response : '❌ ' + (r.error || r.response)}`
+                ).join('\n');
+            } else if (data.error) {
+                resultMsg = `❌ Hata: ${data.error}`;
+            } else {
+                resultMsg = JSON.stringify(data, null, 2);
             }
 
-            // SMS gönderildi olarak işaretle
-            await updateGroup(group.id, {
-                videoSmsSent: true
-            });
+            alert(`--- Operatör Yanıtı ---\n${resultMsg}\n\nGönderilen: ${data.totalSent ?? 0} / ${members.length}`);
 
-            console.log('✅ SMS durumu güncellendi - videoSmsSent:', true);
-            console.log('📢 onSuccess çağrılıyor - gruplar yenilenecek');
-            
-            // Önce state'i güncelle
-            onSuccess();
-            
-            // Sonra mesajı göster ve kapat
-            alert(`✓ ${members.length} kişiye video SMS başarıyla gönderildi!`);
-            onClose();
+            if (data.totalSent > 0) {
+                await updateGroup(group.id, { videoSmsSent: true });
+                onSuccess();
+                onClose();
+            }
         } catch (error) {
             console.error('SMS gönderme hatası:', error);
             alert('Video SMS gönderilemedi. Lütfen tekrar deneyin.');

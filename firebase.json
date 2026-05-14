@@ -1,0 +1,29 @@
+{
+  "hosting": {
+    "public": "public",
+    "rewrites": [
+      {
+        "source": "/api/video/**",
+        "function": "videoRedirect"
+      }
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "Access-Control-Allow-Origin",
+            "value": "*"
+          },
+          {
+            "key": "Access-Control-Allow-Methods",
+            "value": "GET, HEAD, OPTIONS"
+          }
+        ]
+      }
+    ]
+  },
+  "functions": {
+    "source": "functions"
+  }
+}
