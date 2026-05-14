@@ -60,7 +60,8 @@ export interface Group {
     description: string;
     memberIds: string[];
     kesimSiraNo?: number | null;
-    videoUrl?: string | null;
+    videoUrl?: string | null; // Custom domain URL (hisse.ankaraetkurban.com)
+    firebaseVideoUrl?: string | null; // Direct Firebase Storage URL
     videoSmsSent?: boolean;
     createdAt: Date;
 }

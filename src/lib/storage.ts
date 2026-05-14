@@ -6,13 +6,13 @@ import { storage } from './firebase';
  * @param file Video dosyası
  * @param groupId Grup ID (dosya yolu için)
  * @param onProgress Upload progress callback
- * @returns Download URL
+ * @returns { firebaseUrl: string, customUrl: string } - Firebase Storage URL ve custom domain URL
  */
 export async function uploadVideo(
     file: File,
     groupId: string,
     onProgress?: (progress: number) => void
-): Promise<string> {
+): Promise<{ firebaseUrl: string; customUrl: string }> {
     console.log('🔧 uploadVideo başladı', { fileSize: file.size, fileName: file.name });
 
     // Dosya boyut kontrolü (max 100MB)
@@ -69,9 +69,19 @@ export async function uploadVideo(
                 async () => {
                     try {
                         console.log('✅ Upload tamamlandı, URL alınıyor...');
-                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                        console.log('✅ Download URL alındı:', downloadURL);
-                        resolve(downloadURL);
+                        const firebaseUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                        console.log('✅ Firebase Storage URL:', firebaseUrl);
+                        
+                        // Custom domain URL oluştur
+                        // hisse.ankaraetkurban.com veya localhost için uygun base URL
+                        const baseUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+                            ? 'http://localhost:3000'
+                            : 'https://hisse.ankaraetkurban.com';
+                        
+                        const customUrl = `${baseUrl}/api/video/${groupId}`;
+                        console.log('✅ Custom domain URL:', customUrl);
+                        
+                        resolve({ firebaseUrl, customUrl });
                     } catch (error) {
                         console.error('❌ Download URL alma hatası:', error);
                         reject(new Error('Video URL alınamadı.'));

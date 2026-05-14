@@ -110,7 +110,7 @@ export default function VideoUploadModal({ group, onClose, onSuccess }: Props) {
 
         try {
             console.log('📤 uploadVideo fonksiyonu çağrılıyor...');
-            const downloadURL = await uploadVideo(
+            const { firebaseUrl, customUrl } = await uploadVideo(
                 selectedFile,
                 group.id,
                 (progress) => {
@@ -119,18 +119,19 @@ export default function VideoUploadModal({ group, onClose, onSuccess }: Props) {
                 }
             );
 
-            console.log('✅ Video URL alındı:', downloadURL);
+            console.log('✅ Video URLs alındı:', { firebaseUrl, customUrl });
 
-            // URL'i Firestore'a kaydet
+            // Her iki URL'i de Firestore'a kaydet
             await updateGroup(group.id, {
-                videoUrl: downloadURL,
+                videoUrl: customUrl, // SMS ve QR kod için custom URL
+                firebaseVideoUrl: firebaseUrl, // Backup/internal kullanım için
                 videoSmsSent: false
             });
 
-            console.log('✅ Firestore güncellendi - videoUrl:', downloadURL, 'videoSmsSent:', false);
+            console.log('✅ Firestore güncellendi - customUrl:', customUrl, 'firebaseUrl:', firebaseUrl);
 
             setUploadSuccess(true);
-            setUploadedVideoUrl(downloadURL);
+            setUploadedVideoUrl(customUrl);
             setSelectedFile(null);
             setPreviewUrl(null);
             
