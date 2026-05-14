@@ -8,10 +8,10 @@ import { db } from '@/lib/firebase';
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { videoId: string } }
+    { params }: { params: Promise<{ videoId: string }> }
 ) {
     try {
-        const { videoId } = params;
+        const { videoId } = await params;
 
         console.log('🎬 Video redirect request:', videoId);
 
