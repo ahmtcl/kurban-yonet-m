@@ -1,65 +1,51 @@
-import { ref, deleteObject } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { storage } from './firebase';
 
 /**
- * Video dosyasını server-side API üzerinden yükler (CORS sorunu yok)
- * @param file Video dosyası
- * @param groupId Grup ID
- * @param onProgress Upload progress callback
- * @returns { firebaseUrl, customUrl }
+ * Video dosyasını Firebase Storage'a yükler
  */
 export async function uploadVideo(
     file: File,
     groupId: string,
     onProgress?: (progress: number) => void
 ): Promise<{ firebaseUrl: string; customUrl: string }> {
-    console.log('🔧 uploadVideo (server-side) başladı', { fileSize: file.size, fileName: file.name });
+    console.log('🔧 uploadVideo başladı', { fileSize: file.size, fileName: file.name });
 
-    // Dosya boyut kontrolü (max 100MB)
     if (file.size > 100 * 1024 * 1024) {
         throw new Error('Video dosyası çok büyük. Maksimum 100MB olmalıdır.');
     }
 
-    // Dosya format kontrolü
     const allowedTypes = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/webm'];
     if (!allowedTypes.includes(file.type)) {
         throw new Error('Desteklenmeyen video formatı. MP4, MOV, AVI veya WEBM formatında olmalıdır.');
     }
 
-    // XMLHttpRequest ile progress takipli server-side upload
+    const timestamp = Date.now();
+    const ext = file.name.split('.').pop();
+    const fileName = `kurban-videos/${groupId}_${timestamp}.${ext}`;
+
+    const storageRef = ref(storage, fileName);
+    const uploadTask = uploadBytesResumable(storageRef, file);
+
     return new Promise((resolve, reject) => {
-        const formData = new FormData();
-        formData.append('video', file);
-        formData.append('groupId', groupId);
-
-        const xhr = new XMLHttpRequest();
-
-        xhr.upload.onprogress = (event) => {
-            if (event.lengthComputable) {
-                const progress = Math.round((event.loaded / event.total) * 100);
-                console.log('📊 Upload progress:', progress, '%');
+        uploadTask.on(
+            'state_changed',
+            (snapshot) => {
+                const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+                console.log('📊 Progress:', progress, '%');
                 onProgress?.(progress);
+            },
+            (error) => {
+                console.error('❌ Upload error:', error.code, error.message);
+                reject(new Error(`Video yüklenemedi: ${error.message}`));
+            },
+            async () => {
+                const firebaseUrl = await getDownloadURL(uploadTask.snapshot.ref);
+                const customUrl = `https://hisse.ankaraetkurban.com/api/video/${groupId}`;
+                console.log('✅ Upload tamamlandı:', { firebaseUrl, customUrl });
+                resolve({ firebaseUrl, customUrl });
             }
-        };
-
-        xhr.onload = () => {
-            if (xhr.status === 200) {
-                const result = JSON.parse(xhr.responseText);
-                console.log('✅ Upload tamamlandı:', result);
-                resolve(result);
-            } else {
-                const err = JSON.parse(xhr.responseText);
-                console.error('❌ Upload hatası:', err);
-                reject(new Error(err.error || 'Video yüklenemedi'));
-            }
-        };
-
-        xhr.onerror = () => {
-            reject(new Error('Ağ hatası. İnternet bağlantınızı kontrol edin.'));
-        };
-
-        xhr.open('POST', '/api/upload-video');
-        xhr.send(formData);
+        );
     });
 }
 

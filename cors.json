@@ -5,8 +5,8 @@
       "https://crm.ankaraetkurban.com",
       "https://hisse.ankaraetkurban.com"
     ],
-    "method": ["GET", "HEAD"],
-    "responseHeader": ["Content-Type", "Content-Length", "Content-Range"],
+    "method": ["GET", "HEAD", "POST", "PUT", "DELETE"],
+    "responseHeader": ["Content-Type", "Content-Length", "Content-Range", "Authorization"],
     "maxAgeSeconds": 3600
   }
 ]
