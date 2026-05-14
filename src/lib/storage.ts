@@ -1,23 +1,22 @@
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref, deleteObject } from 'firebase/storage';
 import { storage } from './firebase';
 
 /**
- * Video dosyasını Firebase Storage'a yükler
+ * Video dosyasını server-side API üzerinden yükler (CORS sorunu yok)
  * @param file Video dosyası
- * @param groupId Grup ID (dosya yolu için)
+ * @param groupId Grup ID
  * @param onProgress Upload progress callback
- * @returns { firebaseUrl: string, customUrl: string } - Firebase Storage URL ve custom domain URL
+ * @returns { firebaseUrl, customUrl }
  */
 export async function uploadVideo(
     file: File,
     groupId: string,
     onProgress?: (progress: number) => void
 ): Promise<{ firebaseUrl: string; customUrl: string }> {
-    console.log('🔧 uploadVideo başladı', { fileSize: file.size, fileName: file.name });
+    console.log('🔧 uploadVideo (server-side) başladı', { fileSize: file.size, fileName: file.name });
 
     // Dosya boyut kontrolü (max 100MB)
-    const MAX_SIZE = 100 * 1024 * 1024; // 100MB
-    if (file.size > MAX_SIZE) {
+    if (file.size > 100 * 1024 * 1024) {
         throw new Error('Video dosyası çok büyük. Maksimum 100MB olmalıdır.');
     }
 
@@ -27,77 +26,45 @@ export async function uploadVideo(
         throw new Error('Desteklenmeyen video formatı. MP4, MOV, AVI veya WEBM formatında olmalıdır.');
     }
 
-    // Unique dosya adı oluştur
-    const timestamp = Date.now();
-    const fileName = `${groupId}_${timestamp}.${file.name.split('.').pop()}`;
-    console.log('📁 Storage path:', `kurban-videos/${fileName}`);
-    
-    try {
-        const storageRef = ref(storage, `kurban-videos/${fileName}`);
-        console.log('📦 Storage ref oluşturuldu');
+    // XMLHttpRequest ile progress takipli server-side upload
+    return new Promise((resolve, reject) => {
+        const formData = new FormData();
+        formData.append('video', file);
+        formData.append('groupId', groupId);
 
-        // Upload başlat
-        const uploadTask = uploadBytesResumable(storageRef, file);
-        console.log('🚀 Upload task başlatıldı');
+        const xhr = new XMLHttpRequest();
 
-        return new Promise((resolve, reject) => {
-            uploadTask.on(
-                'state_changed',
-                (snapshot) => {
-                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    console.log('📊 Progress update:', Math.round(progress), '%');
-                    if (onProgress) {
-                        onProgress(Math.round(progress));
-                    }
-                },
-                (error) => {
-                    console.error('❌ Upload error:', error);
-                    console.error('Error code:', error.code);
-                    console.error('Error message:', error.message);
-                    
-                    // Firebase Storage hata kodları
-                    if (error.code === 'storage/unauthorized') {
-                        reject(new Error('Yetki hatası. Firebase Storage rules kontrol edilmeli.'));
-                    } else if (error.code === 'storage/canceled') {
-                        reject(new Error('Yükleme iptal edildi.'));
-                    } else if (error.code === 'storage/unknown') {
-                        reject(new Error('Bilinmeyen hata. Lütfen internet bağlantınızı kontrol edin.'));
-                    } else {
-                        reject(new Error(`Video yüklenemedi: ${error.message}`));
-                    }
-                },
-                async () => {
-                    try {
-                        console.log('✅ Upload tamamlandı, URL alınıyor...');
-                        const firebaseUrl = await getDownloadURL(uploadTask.snapshot.ref);
-                        console.log('✅ Firebase Storage URL:', firebaseUrl);
-                        
-                        // Custom domain URL oluştur
-                        // hisse.ankaraetkurban.com veya localhost için uygun base URL
-                        const baseUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-                            ? 'http://localhost:3000'
-                            : 'https://hisse.ankaraetkurban.com';
-                        
-                        const customUrl = `${baseUrl}/api/video/${groupId}`;
-                        console.log('✅ Custom domain URL:', customUrl);
-                        
-                        resolve({ firebaseUrl, customUrl });
-                    } catch (error) {
-                        console.error('❌ Download URL alma hatası:', error);
-                        reject(new Error('Video URL alınamadı.'));
-                    }
-                }
-            );
-        });
-    } catch (error: any) {
-        console.error('❌ Storage ref oluşturma hatası:', error);
-        throw new Error(`Storage hatası: ${error.message}`);
-    }
+        xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+                const progress = Math.round((event.loaded / event.total) * 100);
+                console.log('📊 Upload progress:', progress, '%');
+                onProgress?.(progress);
+            }
+        };
+
+        xhr.onload = () => {
+            if (xhr.status === 200) {
+                const result = JSON.parse(xhr.responseText);
+                console.log('✅ Upload tamamlandı:', result);
+                resolve(result);
+            } else {
+                const err = JSON.parse(xhr.responseText);
+                console.error('❌ Upload hatası:', err);
+                reject(new Error(err.error || 'Video yüklenemedi'));
+            }
+        };
+
+        xhr.onerror = () => {
+            reject(new Error('Ağ hatası. İnternet bağlantınızı kontrol edin.'));
+        };
+
+        xhr.open('POST', '/api/upload-video');
+        xhr.send(formData);
+    });
 }
 
 /**
  * Video dosyasını Firebase Storage'dan siler
- * @param videoUrl Video URL
  */
 export async function deleteVideo(videoUrl: string): Promise<void> {
     try {
