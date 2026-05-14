@@ -17,4 +17,13 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
 
+// Domain logging
+if (typeof window !== 'undefined') {
+  console.log('🔥 Firebase initialized');
+  console.log('🌐 Current domain:', window.location.hostname);
+  console.log('📋 Firebase authDomain:', firebaseConfig.authDomain);
+  console.log('⚠️ Ensure this domain is added to Firebase Console -> Authentication -> Settings -> Authorized domains');
+  console.log('   Required domains: crm.ankaraetkurban.com, hisse.ankaraetkurban.com');
+}
+
 export { app, db, auth, storage };

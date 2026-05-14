@@ -34,21 +34,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const login = async (username: string, password: string) => {
         try {
+            console.log('🔐 Login attempt:', { username, domain: window.location.hostname });
             const cleanUsername = username.trim();
             const cleanPassword = password.trim();
+            
+            console.log('📡 Fetching user from Firestore...');
             const dbUser = await getUserByUsername(cleanUsername);
+            console.log('✅ User fetched:', dbUser ? 'User found' : '❌ User not found');
 
             // Note: In a production app, use proper hashing. 
             // For now, simple check as requested "id ve psw gereksin".
             if (dbUser && dbUser.password === cleanPassword) {
+                console.log('✅ Password match, logging in...');
                 const { password: _, ...safeUser } = dbUser;
                 setUser(safeUser as User);
                 localStorage.setItem('kurban_user', JSON.stringify(safeUser));
                 return true;
             }
+            console.warn('❌ Invalid credentials');
             return false;
         } catch (error) {
-            console.error('Login error', error);
+            console.error('❌ Login error:', error);
+            console.error('Error details:', {
+                message: error instanceof Error ? error.message : 'Unknown error',
+                domain: window.location.hostname,
+                firebaseConfig: '(check console for Firebase init errors)'
+            });
             return false;
         }
     };
