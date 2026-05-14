@@ -17,13 +17,14 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
 
-// Domain logging
+// Domain ve Firestore logging
 if (typeof window !== 'undefined') {
   console.log('🔥 Firebase initialized');
   console.log('🌐 Current domain:', window.location.hostname);
-  console.log('📋 Firebase authDomain:', firebaseConfig.authDomain);
-  console.log('⚠️ Ensure this domain is added to Firebase Console -> Authentication -> Settings -> Authorized domains');
-  console.log('   Required domains: crm.ankaraetkurban.com, hisse.ankaraetkurban.com');
+  console.log('📋 Project ID:', firebaseConfig.projectId);
+  console.log('📦 Firestore ready:', db ? 'YES' : 'NO');
+  console.log('⚠️ Note: Using Firestore ONLY (not Firebase Auth)');
+  console.log('⚠️ Ensure Firestore Rules allow read/write from this domain');
 }
 
 export { app, db, auth, storage };

@@ -330,11 +330,34 @@ export async function deleteUser(id: string) {
 }
 
 export async function getUserByUsername(username: string): Promise<User | null> {
-    const q = query(collection(db, 'users'), where('username', '==', username), where('isActive', '==', true));
-    const snap = await getDocs(q);
-    if (snap.empty) return null;
-    const doc = snap.docs[0];
-    return { id: doc.id, ...doc.data(), createdAt: doc.data().createdAt?.toDate?.() || new Date() } as User;
+    try {
+        console.log('📊 Firestore query: users collection, username:', username);
+        const q = query(collection(db, 'users'), where('username', '==', username), where('isActive', '==', true));
+        
+        console.log('📡 Executing Firestore getDocs...');
+        const snap = await getDocs(q);
+        
+        console.log('📦 Firestore result:', { empty: snap.empty, docCount: snap.docs.length });
+        
+        if (snap.empty) {
+            console.warn('❌ No user found with username:', username);
+            return null;
+        }
+        
+        const doc = snap.docs[0];
+        const userData = { id: doc.id, ...doc.data(), createdAt: doc.data().createdAt?.toDate?.() || new Date() } as User;
+        
+        console.log('✅ User found:', { id: userData.id, username: userData.username, role: userData.role });
+        return userData;
+    } catch (error) {
+        console.error('❌ Firestore getUserByUsername error:', error);
+        console.error('Error details:', {
+            code: (error as any).code,
+            message: (error as any).message,
+            username,
+        });
+        throw error;
+    }
 }
 
 // ===== NOTIFICATIONS =====
