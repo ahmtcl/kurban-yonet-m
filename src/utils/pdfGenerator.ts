@@ -317,7 +317,19 @@ export const generateKesimListesiPDF = async (
             doc.setFontSize(20); // Font artırıldı (14 → 20pt)
             doc.setTextColor(0, 0, 0);
             doc.text('KÜÇÜKBAŞ KURBAN', W / 2, y, { align: 'center' });
-            y += 30;
+            y += 10;
+
+            // İndirimli hisse tipi etiketi (hisse adı % ile başlıyorsa)
+            const selectedShareType = shareTypes.find(st => st.id === kucukbasShareTypeId);
+            if (selectedShareType?.name?.startsWith('%')) {
+                doc.setFont(font, 'bold');
+                doc.setFontSize(14);
+                doc.setTextColor(0, 0, 0);
+                doc.text(selectedShareType.name.toUpperCase(), W / 2, y, { align: 'center' });
+                y += 10;
+            } else {
+                y += 20;
+            }
 
             // Büyük numara (maksimum boyut)
             doc.setFont(font, 'bold');
