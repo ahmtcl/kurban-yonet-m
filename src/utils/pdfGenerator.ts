@@ -733,6 +733,7 @@ export const generateEtiketPDF = async (
 //  Her kayıt için 100×100 mm sayfada 2 kopya (çantanın 2 yüzü)
 // ────────────────────────────────────────────────────────────────
 export const generateKucukbasEtiketPDF = async (
+    allGroups: Group[],
     allRecords: Record[],
     shareTypes: ShareType[],
     settings: Settings | null,
@@ -768,16 +769,20 @@ export const generateKucukbasEtiketPDF = async (
 
     const font = doc.getFontList().hasOwnProperty('Roboto') ? 'Roboto' : 'helvetica';
 
-    // Hangi kayıtlar basılacak (iptal edilenler ve gruba ait büyükbaş kayıtları hariç)
-    const targetRecords = allRecords
+    // Hangi kayıtlar basılacak (iptal edilenler hariç)
+    // Tüm eşleşen kayıtları sırala (sıra numarası hesabı için)
+    const allFiltered = allRecords
         .filter(r => {
-            if (singleRecordId) return r.id === singleRecordId;
-            if (r.daySelection !== day || r.status === 'cancelled' || r.groupId) return false;
+            if (r.daySelection !== day || r.status === 'cancelled') return false;
             const st = shareTypes.find(s => s.id === r.shareTypeId);
             const kt = st?.kucukbasType || 'buyukbas';
             return type === 'indirimli' ? kt === 'kucukbas-indirimli' : kt === 'kucukbas-normal';
         })
         .sort((a, b) => (a.orderNumber ?? 999999) - (b.orderNumber ?? 999999));
+
+    const targetRecords = singleRecordId
+        ? allFiltered.filter(r => r.id === singleRecordId)
+        : allFiltered;
 
     if (targetRecords.length === 0) {
         alert('Seçilen güne ait kayıt bulunamadı.');
@@ -839,7 +844,7 @@ export const generateKucukbasEtiketPDF = async (
             doc.setFont(font, 'bold');
             doc.setFontSize(16);
             doc.setTextColor(0, 0, 0);
-            const siraStr = record.orderNumber ? String(record.orderNumber) : '-';
+            const siraStr = String(allFiltered.findIndex(r => r.id === record.id) + 1);
             doc.text(siraStr, boxX + boxW / 2, boxY + boxH * 0.68, { align: 'center' });
 
             // Tür etiketi (sol)

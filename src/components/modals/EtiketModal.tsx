@@ -56,11 +56,9 @@ export default function EtiketModal({ onClose }: Props) {
     );
 
     const filteredRecords = useMemo(() => {
-        const base = records.filter(r =>
-            r.daySelection === day && r.status !== 'cancelled' && !r.groupId
-        );
-        return base
+        return records
             .filter(r => {
+                if (r.daySelection !== day || r.status === 'cancelled') return false;
                 const st = shareTypes.find(s => s.id === r.shareTypeId);
                 const kt = st?.kucukbasType || 'buyukbas';
                 return hayvanTuru === 'kucukbas-indirimli'
@@ -68,7 +66,7 @@ export default function EtiketModal({ onClose }: Props) {
                     : kt === 'kucukbas-normal';
             })
             .sort((a, b) => (a.orderNumber ?? 999999) - (b.orderNumber ?? 999999));
-    }, [records, day, hayvanTuru, shareTypes]);
+    }, [records, groups, day, hayvanTuru, shareTypes]);
 
     const handleAll = async () => {
         setGenerating('all');
@@ -77,7 +75,7 @@ export default function EtiketModal({ onClose }: Props) {
                 await generateEtiketPDF(groups, records, shareTypes, settings, day);
             } else {
                 const type = hayvanTuru === 'kucukbas-indirimli' ? 'indirimli' : 'normal';
-                await generateKucukbasEtiketPDF(records, shareTypes, settings, day, type);
+                await generateKucukbasEtiketPDF(groups, records, shareTypes, settings, day, type);
             }
         } catch (e) {
             console.error(e);
@@ -103,7 +101,7 @@ export default function EtiketModal({ onClose }: Props) {
         setGenerating(recordId);
         try {
             const type = hayvanTuru === 'kucukbas-indirimli' ? 'indirimli' : 'normal';
-            await generateKucukbasEtiketPDF(records, shareTypes, settings, day, type, recordId);
+            await generateKucukbasEtiketPDF(groups, records, shareTypes, settings, day, type, recordId);
         } catch (e) {
             console.error(e);
             alert('PDF oluşturulurken hata oluştu.');
@@ -318,14 +316,14 @@ export default function EtiketModal({ onClose }: Props) {
                                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                         <thead>
                                             <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
-                                                <th style={{ padding: '8px 6px', textAlign: 'left', fontSize: 12, color: '#6b7280', fontWeight: 600 }}>SİP. NO</th>
+                                                <th style={{ padding: '8px 6px', textAlign: 'left', fontSize: 12, color: '#6b7280', fontWeight: 600 }}>KESİM SIRA</th>
                                                 <th style={{ padding: '8px 6px', textAlign: 'left', fontSize: 12, color: '#6b7280', fontWeight: 600 }}>AD SOYAD</th>
                                                 <th style={{ padding: '8px 6px', textAlign: 'left', fontSize: 12, color: '#6b7280', fontWeight: 600 }}>HİSSE TİPİ</th>
                                                 <th style={{ padding: '8px 6px', textAlign: 'right', fontSize: 12, color: '#6b7280', fontWeight: 600 }}></th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {filteredRecords.map(record => {
+                                            {filteredRecords.map((record, idx) => {
                                                 const st = shareTypes.find(s => s.id === record.shareTypeId);
                                                 const isGenerating = generating === record.id;
                                                 const btnColor = hayvanTuru === 'kucukbas-indirimli' ? '#f59e0b' : '#10b981';
@@ -333,7 +331,7 @@ export default function EtiketModal({ onClose }: Props) {
                                                 return (
                                                     <tr key={record.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                                                         <td style={{ padding: '8px 6px', fontSize: 13, fontWeight: 700, color: '#374151' }}>
-                                                            {record.orderNumber ? `#${String(record.orderNumber).padStart(4, '0')}` : '—'}
+                                                            {idx + 1}
                                                         </td>
                                                         <td style={{ padding: '8px 6px', fontSize: 13 }}>{record.ownerName}</td>
                                                         <td style={{ padding: '8px 6px', fontSize: 12, color: '#6b7280' }}>
