@@ -41,6 +41,7 @@ export default function AdminPage() {
     const [newShareMinKg, setNewShareMinKg] = useState('');
     const [newShareMaxKg, setNewShareMaxKg] = useState('');
     const [newShareStock, setNewShareStock] = useState('');
+    const [newShareKucukbasType, setNewShareKucukbasType] = useState<'buyukbas' | 'kucukbas-normal' | 'kucukbas-indirimli'>('buyukbas');
     const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
     useEffect(() => {
@@ -139,13 +140,15 @@ export default function AdminPage() {
                 minKg: parseFloat(newShareMinKg) || 0,
                 maxKg: parseFloat(newShareMaxKg) || 0,
                 stockQuantity: parseInt(newShareStock) || 0,
-                isActive: true
+                isActive: true,
+                kucukbasType: newShareKucukbasType,
             });
             setNewShareName('');
             setNewSharePrice('');
             setNewShareMinKg('');
             setNewShareMaxKg('');
             setNewShareStock('');
+            setNewShareKucukbasType('buyukbas');
             loadData();
         } catch (e) {
             alert('Ekleme hatası');
@@ -800,6 +803,14 @@ export default function AdminPage() {
                                         <label className="form-label">Stok Adedi</label>
                                         <input type="number" className="form-input" value={newShareStock} onChange={e => setNewShareStock(e.target.value)} placeholder="0" />
                                     </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Hayvan Türü</label>
+                                        <select className="form-select" value={newShareKucukbasType} onChange={e => setNewShareKucukbasType(e.target.value as 'buyukbas' | 'kucukbas-normal' | 'kucukbas-indirimli')}>
+                                            <option value="buyukbas">🐄 Büyükbaş</option>
+                                            <option value="kucukbas-normal">🐑 Normal Küçükbaş</option>
+                                            <option value="kucukbas-indirimli">🏷️ İndirimli Küçükbaş</option>
+                                        </select>
+                                    </div>
                                     <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
                                         <button className="btn btn-primary" onClick={handleAddShareType} disabled={saving} style={{ height: 42 }}>
                                             <FiPlus /> Ekle
@@ -813,6 +824,7 @@ export default function AdminPage() {
                                         <thead>
                                             <tr style={{ background: '#f8fafc', textAlign: 'left' }}>
                                                 <th style={{ padding: 10 }}>Hisse Adı</th>
+                                                <th style={{ padding: 10 }}>Hayvan Türü</th>
                                                 <th style={{ padding: 10 }}>Fiyat</th>
                                                 <th style={{ padding: 10 }}>KG Aralığı</th>
                                                 <th style={{ padding: 10 }}>HİSSE STOK ADEDİ</th>
@@ -828,6 +840,22 @@ export default function AdminPage() {
                                                 return (
                                                 <tr key={st.id} style={{ borderBottom: '1px solid #eee' }}>
                                                     <td style={{ padding: 10, fontWeight: 500 }}>{st.name}</td>
+                                                    <td style={{ padding: 10 }}>
+                                                        <select
+                                                            className="form-select"
+                                                            style={{ padding: '4px 8px', fontSize: 12, minWidth: 160 }}
+                                                            value={st.kucukbasType || 'buyukbas'}
+                                                            onChange={async e => {
+                                                                const val = e.target.value as 'buyukbas' | 'kucukbas-normal' | 'kucukbas-indirimli';
+                                                                await updateShareType(st.id, { kucukbasType: val });
+                                                                setShareTypes(prev => prev.map(s => s.id === st.id ? { ...s, kucukbasType: val } : s));
+                                                            }}
+                                                        >
+                                                            <option value="buyukbas">🐄 Büyükbaş</option>
+                                                            <option value="kucukbas-normal">🐑 Normal Küçükbaş</option>
+                                                            <option value="kucukbas-indirimli">🏷️ İndirimli Küçükbaş</option>
+                                                        </select>
+                                                    </td>
                                                     <td style={{ padding: 10 }}>{st.price.toLocaleString('tr-TR')} ₺</td>
                                                     <td style={{ padding: 10 }}>{st.minKg} - {st.maxKg} KG</td>
                                                     <td style={{ padding: 10 }}>

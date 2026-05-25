@@ -6,6 +6,7 @@ export interface ShareType {
     price: number;
     isActive: boolean;
     stockQuantity: number;
+    kucukbasType?: 'buyukbas' | 'kucukbas-normal' | 'kucukbas-indirimli';
     createdAt: Date;
 }
 

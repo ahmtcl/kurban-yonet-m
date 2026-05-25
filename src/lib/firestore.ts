@@ -31,6 +31,7 @@ export async function getShareTypes(): Promise<ShareType[]> {
         price: d.data().price,
         isActive: d.data().isActive ?? true,
         stockQuantity: d.data().stockQuantity ?? 0,
+        kucukbasType: d.data().kucukbasType,
         createdAt: d.data().createdAt?.toDate?.() || new Date(),
     }));
 

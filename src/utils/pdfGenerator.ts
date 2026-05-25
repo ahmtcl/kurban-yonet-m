@@ -728,6 +728,195 @@ export const generateEtiketPDF = async (
     doc.save(`etiket-${dayStr}-${dateStr}.pdf`);
 };
 
+// ────────────────────────────────────────────────────────────────
+//  KÜÇÜKBAŞ ETİKET  (normal veya indirimli)
+//  Her kayıt için 100×100 mm sayfada 2 kopya (çantanın 2 yüzü)
+// ────────────────────────────────────────────────────────────────
+export const generateKucukbasEtiketPDF = async (
+    allRecords: Record[],
+    shareTypes: ShareType[],
+    settings: Settings | null,
+    day: 1 | 2 | 3,
+    type: 'normal' | 'indirimli',
+    singleRecordId?: string,
+) => {
+    const W = 100;
+    const H = 100;
+
+    const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: [W, H],
+    });
+
+    // Font yükle
+    const loadFont = async (url: string, name: string, style: string) => {
+        try {
+            const res = await fetch(url);
+            const buf = await res.arrayBuffer();
+            const b64 = btoa(new Uint8Array(buf).reduce((d, b) => d + String.fromCharCode(b), ''));
+            doc.addFileToVFS(`${name}-${style}.ttf`, b64);
+            doc.addFont(`${name}-${style}.ttf`, name, style);
+            return true;
+        } catch { return false; }
+    };
+
+    await Promise.all([
+        loadFont(robotoRegularUrl, 'Roboto', 'normal'),
+        loadFont(robotoBoldUrl, 'Roboto', 'bold'),
+    ]);
+
+    const font = doc.getFontList().hasOwnProperty('Roboto') ? 'Roboto' : 'helvetica';
+
+    // Hangi kayıtlar basılacak (iptal edilenler ve gruba ait büyükbaş kayıtları hariç)
+    const targetRecords = allRecords
+        .filter(r => {
+            if (singleRecordId) return r.id === singleRecordId;
+            if (r.daySelection !== day || r.status === 'cancelled' || r.groupId) return false;
+            const st = shareTypes.find(s => s.id === r.shareTypeId);
+            const kt = st?.kucukbasType || 'buyukbas';
+            return type === 'indirimli' ? kt === 'kucukbas-indirimli' : kt === 'kucukbas-normal';
+        })
+        .sort((a, b) => (a.orderNumber ?? 999999) - (b.orderNumber ?? 999999));
+
+    if (targetRecords.length === 0) {
+        alert('Seçilen güne ait kayıt bulunamadı.');
+        return;
+    }
+
+    const dayLabel = (d: number) => {
+        if (d === 1) return settings?.day1Label || '1. GÜN';
+        if (d === 2) return settings?.day2Label || '2. GÜN';
+        return '3. GÜN';
+    };
+
+    const typeLabel = type === 'indirimli' ? 'İNDİRİMLİ KÜÇÜKBAŞ' : 'KÜÇÜKBAŞ';
+    const isIndirimli = type === 'indirimli';
+
+    doc.deletePage(1);
+
+    for (const record of targetRecords) {
+        const shareType = shareTypes.find(st => st.id === record.shareTypeId);
+        const stName    = shareType?.name || record.shareTypeName || '';
+
+        // Her kayıt için 2 kopya (çantanın ön ve arka yüzü)
+        for (let copy = 0; copy < 2; copy++) {
+            doc.addPage([W, H], 'portrait');
+
+            doc.setDrawColor(0, 0, 0);
+            doc.setTextColor(0, 0, 0);
+            doc.setFillColor(255, 255, 255);
+
+            const margin = 3;
+            const innerW = W - margin * 2;
+
+            // Dış kenarlık
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.8);
+            doc.rect(margin, margin, innerW, H - margin * 2);
+
+            // ── ÜST BÖLÜM: Tür etiketi + Sıra no ──
+            const topH = 22;
+
+            // İndirimli için açık yeşil arka plan
+            if (isIndirimli) {
+                doc.setFillColor(236, 253, 245);
+                doc.rect(margin, margin, innerW, topH, 'F');
+            }
+
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.5);
+            doc.line(margin, margin + topH, margin + innerW, margin + topH);
+
+            // Sıra no kutusu (sağ)
+            const boxW = 22;
+            const boxH = topH - 4;
+            const boxX = margin + innerW - boxW - 2;
+            const boxY = margin + 2;
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(1.2);
+            doc.rect(boxX, boxY, boxW, boxH);
+            doc.setFont(font, 'bold');
+            doc.setFontSize(16);
+            doc.setTextColor(0, 0, 0);
+            const siraStr = record.orderNumber ? String(record.orderNumber) : '-';
+            doc.text(siraStr, boxX + boxW / 2, boxY + boxH * 0.68, { align: 'center' });
+
+            // Tür etiketi (sol)
+            const maxLabelW = boxX - margin - 5;
+            let labelFontSize = 13;
+            doc.setFont(font, 'bold');
+            doc.setFontSize(labelFontSize);
+            while (labelFontSize > 7 && doc.getTextWidth(typeLabel) > maxLabelW) {
+                labelFontSize -= 1;
+                doc.setFontSize(labelFontSize);
+            }
+            doc.setTextColor(isIndirimli ? 6 : 0, isIndirimli ? 95 : 0, isIndirimli ? 70 : 0);
+            doc.text(typeLabel, margin + 3, margin + topH / 2 + labelFontSize * 0.18, { maxWidth: maxLabelW });
+
+            // ── ORTA BÖLÜM: Gün + Ad Soyad + Hisse tipi + Sipariş no ──
+            let y = margin + topH + 7;
+
+            // Kesim günü
+            doc.setFont(font, 'bold');
+            doc.setFontSize(9);
+            doc.setTextColor(0, 0, 0);
+            doc.text(`${dayLabel(record.daySelection)} TESLİM`, W / 2, y, { align: 'center' });
+            y += 7;
+
+            // Ad Soyad (büyük)
+            doc.setFont(font, 'bold');
+            doc.setFontSize(14);
+            doc.setTextColor(0, 0, 0);
+            const nameLines = doc.splitTextToSize(record.ownerName.toUpperCase(), innerW - 6);
+            doc.text(nameLines[0], W / 2, y, { align: 'center' });
+            y += 7;
+            if (nameLines.length > 1) {
+                doc.text(nameLines[1], W / 2, y, { align: 'center' });
+                y += 6;
+            }
+
+            // Hisse tipi adı
+            if (stName) {
+                doc.setFont(font, 'normal');
+                doc.setFontSize(8);
+                doc.setTextColor(80, 80, 80);
+                doc.text(stName, W / 2, y, { align: 'center' });
+                y += 5;
+            }
+
+            // Sipariş no
+            if (record.orderNumber) {
+                doc.setFont(font, 'normal');
+                doc.setFontSize(8);
+                doc.setTextColor(80, 80, 80);
+                doc.text(`Sipariş No: #${String(record.orderNumber).padStart(4, '0')}`, W / 2, y, { align: 'center' });
+                y += 5;
+            }
+
+            // ── QR / Placeholder (merkeze hizalı, altta) ──
+            const qrSize = 22;
+            const qrX    = (W - qrSize) / 2;
+            const remaining = (H - margin) - y - 3;
+            const qrY    = y + Math.max(2, (remaining - qrSize - 6) / 2);
+
+            doc.setLineWidth(0.3);
+            doc.setDrawColor(0, 0, 0);
+            doc.rect(qrX, qrY, qrSize, qrSize);
+            doc.setFont(font, 'normal');
+            doc.setFontSize(5.5);
+            doc.setTextColor(160, 160, 160);
+            doc.text('QR', qrX + qrSize / 2, qrY + qrSize / 2 - 2,  { align: 'center' });
+            doc.text('KOD', qrX + qrSize / 2, qrY + qrSize / 2 + 3, { align: 'center' });
+        }
+    }
+
+    const typeStr = isIndirimli ? 'indirimli' : 'normal';
+    const dayStr  = singleRecordId ? 'tek' : `gun${day}`;
+    const dateStr = new Date().toLocaleDateString('tr-TR').replace(/\./g, '-');
+    doc.save(`kucukbas-${typeStr}-${dayStr}-${dateStr}.pdf`);
+};
+
 // ===== PADOK LİSTESİ PDF (A4 DİKEY, çift sütun) =====
 export const generatePadokListesiPDF = async (
     groups: Group[],
